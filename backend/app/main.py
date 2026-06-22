@@ -41,6 +41,7 @@ from .schemas import (
     StudentGroupUpdate,
 )
 from .scheduler import generate_schedule
+from .llm import suggest_adjustments
 
 Base.metadata.create_all(bind=engine)
 
@@ -343,7 +344,20 @@ def delete_entry(entry_id: int, db: Session = Depends(get_db)):
 @router.post("/schedule/generate", response_model=GenerateResult)
 def run_generate(db: Session = Depends(get_db)):
     count, conflicts = generate_schedule(db)
-    return GenerateResult(entries_count=count, conflicts=conflicts)
+    suggestions = None
+    if conflicts or count == 0:
+        context = {
+            "lecturers": db.query(Lecturer).count(),
+            "rooms": db.query(Room).count(),
+            "groups": db.query(StudentGroup).count(),
+            "assignments": db.query(CourseAssignment).count(),
+            "available_slots": db.query(Room).count() * 5 * 5,
+        }
+        try:
+            suggestions = suggest_adjustments(conflicts, context)
+        except Exception:
+            pass
+    return GenerateResult(entries_count=count, conflicts=conflicts, suggestions=suggestions)
 
 
 @router.delete("/schedule/clear", status_code=204)

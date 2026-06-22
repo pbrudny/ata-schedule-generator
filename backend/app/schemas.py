@@ -198,3 +198,4 @@ class ScheduleEntryOut(ScheduleEntryBase):
 class GenerateResult(BaseModel):
     entries_count: int
     conflicts: list[str]
+    suggestions: Optional[str] = None

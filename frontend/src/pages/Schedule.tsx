@@ -40,6 +40,7 @@ export default function SchedulePage() {
   const [filterId, setFilterId]     = useState<number | "">("");
   const [generating, setGenerating] = useState(false);
   const [message, setMessage]       = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [suggestions, setSuggestions] = useState<string | null>(null);
   const calRef = useRef<FullCalendar>(null);
 
   const loadMeta = async () => {
@@ -66,14 +67,15 @@ export default function SchedulePage() {
   useEffect(() => { loadSchedule(); }, [filterMode, filterId]); // eslint-disable-line
 
   const generate = async () => {
-    setGenerating(true); setMessage(null);
+    setGenerating(true); setMessage(null); setSuggestions(null);
     try {
-      const res = await api.generate() as { entries_count: number; conflicts: string[] };
+      const res = await api.generate() as { entries_count: number; conflicts: string[]; suggestions?: string };
       if (res.conflicts.length > 0) {
         setMessage({ type: "error", text: res.conflicts.join(" | ") });
       } else {
         setMessage({ type: "success", text: `Plan wygenerowany pomyślnie — ${res.entries_count} wpisów.` });
       }
+      if (res.suggestions) setSuggestions(res.suggestions);
       loadSchedule();
     } catch (e: unknown) {
       setMessage({ type: "error", text: String(e) });
@@ -108,6 +110,20 @@ export default function SchedulePage() {
       {message && (
         <div className={`alert ${message.type === "error" ? "alert-error" : "alert-success"}`}>
           {message.text}
+        </div>
+      )}
+
+      {suggestions && (
+        <div style={{
+          background: "#fffbeb", border: "1px solid #fbbf24", borderRadius: "8px",
+          padding: "1rem 1.25rem", marginBottom: "1rem",
+        }}>
+          <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "#92400e", marginBottom: "0.5rem" }}>
+            Sugestie AI — jak poprawić dane, by wygenerować plan:
+          </div>
+          <div style={{ fontSize: "0.875rem", color: "#78350f", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+            {suggestions}
+          </div>
         </div>
       )}
 

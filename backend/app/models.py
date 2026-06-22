@@ -1,8 +1,16 @@
 import uuid
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Table, Text, JSON
 from sqlalchemy.orm import relationship
 
 from .database import Base
+
+
+lecturer_courses = Table(
+    "lecturer_courses",
+    Base.metadata,
+    Column("lecturer_id", Integer, ForeignKey("lecturers.id", ondelete="CASCADE"), primary_key=True),
+    Column("course_id",   Integer, ForeignKey("courses.id",   ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Lecturer(Base):
@@ -17,6 +25,7 @@ class Lecturer(Base):
     preferences = Column(Text, default="")
     public_token = Column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
 
+    can_teach = relationship("Course", secondary=lecturer_courses, lazy="select")
     assignments = relationship("CourseAssignment", back_populates="lecturer")
     schedule_entries = relationship("ScheduleEntry", back_populates="lecturer")
 

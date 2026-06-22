@@ -6,6 +6,7 @@ export interface Lecturer {
   availability: AvailabilitySlot[];
   preferences: string;
   public_token: string | null;
+  can_teach: Course[];
 }
 
 export interface AvailabilitySlot {

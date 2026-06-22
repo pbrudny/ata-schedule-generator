@@ -70,7 +70,9 @@ def list_lecturers(db: Session = Depends(get_db)):
 
 @router.post("/lecturers", response_model=LecturerOut, status_code=201)
 def create_lecturer(body: LecturerCreate, db: Session = Depends(get_db)):
-    obj = Lecturer(**body.model_dump())
+    obj = Lecturer(**body.model_dump(exclude={"course_ids"}))
+    if body.course_ids:
+        obj.can_teach = db.query(Course).filter(Course.id.in_(body.course_ids)).all()
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -90,8 +92,10 @@ def update_lecturer(lecturer_id: int, body: LecturerUpdate, db: Session = Depend
     obj = db.get(Lecturer, lecturer_id)
     if not obj:
         raise HTTPException(404, "Wykładowca nie istnieje")
-    for k, v in body.model_dump(exclude_none=True).items():
+    for k, v in body.model_dump(exclude_none=True, exclude={"course_ids"}).items():
         setattr(obj, k, v)
+    if body.course_ids is not None:
+        obj.can_teach = db.query(Course).filter(Course.id.in_(body.course_ids)).all()
     db.commit()
     db.refresh(obj)
     return obj

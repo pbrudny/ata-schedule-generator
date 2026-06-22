@@ -13,7 +13,7 @@ class LecturerBase(BaseModel):
 
 
 class LecturerCreate(LecturerBase):
-    pass
+    course_ids: list[int] = []
 
 
 class LecturerUpdate(BaseModel):
@@ -22,11 +22,13 @@ class LecturerUpdate(BaseModel):
     title: Optional[str] = None
     availability: Optional[list[Any]] = None
     preferences: Optional[str] = None
+    course_ids: Optional[list[int]] = None
 
 
 class LecturerOut(LecturerBase):
     id: int
     public_token: Optional[str] = None
+    can_teach: list["CourseOut"] = []
     model_config = {"from_attributes": True}
 
 

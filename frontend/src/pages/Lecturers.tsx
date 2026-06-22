@@ -1,54 +1,72 @@
 import { useEffect, useState } from "react";
-import { lecturers as api } from "../api";
-import AvailabilityEditor from "../components/AvailabilityEditor";
-import { AvailabilitySlot, Lecturer } from "../types";
+import { lecturers as api, courses as coursesApi } from "../api";
+import { Course, Lecturer } from "../types";
 
-type ModalState = { id?: number; public_token?: string | null; name: string; email: string; title: string; availability: AvailabilitySlot[]; preferences: string };
-
-const EMPTY: ModalState = {
-  name: "", email: "", title: "", availability: [], preferences: "",
+type ModalState = {
+  id?: number;
+  public_token?: string | null;
+  name: string;
+  email: string;
+  title: string;
+  preferences: string;
+  course_ids: number[];
 };
+
+const EMPTY: ModalState = { name: "", email: "", title: "", preferences: "", course_ids: [] };
 
 function copyLink(token: string | null | undefined) {
   if (!token) return;
-  const url = `${window.location.origin}/dostepnosc/${token}`;
-  navigator.clipboard.writeText(url);
+  navigator.clipboard.writeText(`${window.location.origin}/dostepnosc/${token}`);
 }
 
 export default function LecturersPage() {
-  const [list, setList]     = useState<Lecturer[]>([]);
-  const [modal, setModal]   = useState<ModalState | null>(null);
-  const [copied, setCopied] = useState<number | null>(null);
-  const [error, setError]   = useState("");
-  const [saving, setSaving] = useState(false);
+  const [list, setList]       = useState<Lecturer[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [modal, setModal]     = useState<ModalState | null>(null);
+  const [copied, setCopied]   = useState<number | null>(null);
+  const [error, setError]     = useState("");
+  const [saving, setSaving]   = useState(false);
 
   const load = () => (api.list() as Promise<Lecturer[]>).then(setList);
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    (coursesApi.list() as Promise<Course[]>).then(setCourses);
+  }, []);
 
   const openNew  = () => setModal({ ...EMPTY });
-  const openEdit = (l: Lecturer) => setModal({ ...l });
-  const close    = () => { setModal(null); setError(""); };
+  const openEdit = (l: Lecturer) => setModal({
+    id: l.id,
+    public_token: l.public_token,
+    name: l.name,
+    email: l.email,
+    title: l.title,
+    preferences: l.preferences,
+    course_ids: l.can_teach.map((c) => c.id),
+  });
+  const close = () => { setModal(null); setError(""); };
 
   const save = async () => {
     if (!modal) return;
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
       if (modal.id) await api.update(modal.id, modal);
       else          await api.create(modal);
-      close();
-      load();
-    } catch (e: unknown) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
-    }
+      close(); load();
+    } catch (e: unknown) { setError(String(e)); }
+    finally { setSaving(false); }
   };
 
   const remove = async (id: number) => {
     if (!confirm("Usunąć wykładowcę?")) return;
-    await api.remove(id);
-    load();
+    await api.remove(id); load();
+  };
+
+  const toggleCourse = (id: number) => {
+    if (!modal) return;
+    const course_ids = modal.course_ids.includes(id)
+      ? modal.course_ids.filter((x) => x !== id)
+      : [...modal.course_ids, id];
+    setModal({ ...modal, course_ids });
   };
 
   const handleCopy = (l: Lecturer) => {
@@ -71,9 +89,8 @@ export default function LecturersPage() {
               <th>Imię i nazwisko</th>
               <th>Tytuł</th>
               <th>Email</th>
-              <th>Dostępność</th>
-              <th>Preferencje</th>
-              <th>Link</th>
+              <th>Może prowadzić</th>
+              <th>Link dostępności</th>
               <th />
             </tr>
           </thead>
@@ -84,14 +101,11 @@ export default function LecturersPage() {
                 <td>{l.title}</td>
                 <td style={{ color: "#6b7280" }}>{l.email}</td>
                 <td>
-                  {l.availability.length === 0
-                    ? <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>bez ograniczeń</span>
-                    : <span className="badge">{l.availability.reduce((n, s) => n + s.blocks.length, 0)} bloków</span>}
-                </td>
-                <td style={{ maxWidth: "180px" }}>
-                  {l.preferences
-                    ? <span style={{ fontSize: "0.78rem", color: "#374151", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{l.preferences}</span>
-                    : <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>}
+                  {l.can_teach.length === 0
+                    ? <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>
+                    : <span style={{ fontSize: "0.8rem", color: "#374151" }}>
+                        {l.can_teach.map((c) => c.name).join(", ")}
+                      </span>}
                 </td>
                 <td>
                   {l.public_token && (
@@ -111,7 +125,7 @@ export default function LecturersPage() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak wykładowców</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak wykładowców</td></tr>
             )}
           </tbody>
         </table>
@@ -140,27 +154,29 @@ export default function LecturersPage() {
             </div>
 
             <div className="form-group">
-              <label>Dostępność</label>
-              <AvailabilityEditor
-                value={modal.availability as AvailabilitySlot[]}
-                onChange={(v) => setModal({ ...modal, availability: v })}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Preferencje</label>
-              <textarea
-                value={modal.preferences ?? ""}
-                onChange={(e) => setModal({ ...modal, preferences: e.target.value })}
-                rows={3}
-                placeholder="Preferencje podane przez wykładowcę..."
-                style={{ width: "100%", boxSizing: "border-box", padding: "0.5rem 0.6rem", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.875rem", resize: "vertical", fontFamily: "inherit" }}
-              />
+              <label>Przedmioty, które może prowadzić</label>
+              {courses.length === 0
+                ? <p style={{ fontSize: "0.85rem", color: "#9ca3af", margin: "4px 0" }}>Najpierw dodaj przedmioty</p>
+                : <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginTop: "6px", maxHeight: "200px", overflowY: "auto", padding: "4px 0" }}>
+                    {courses.map((c) => (
+                      <label key={c.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={modal.course_ids.includes(c.id)}
+                          onChange={() => toggleCourse(c.id)}
+                          style={{ width: "15px", height: "15px", cursor: "pointer" }}
+                        />
+                        <span style={{ color: "#374151" }}>{c.name}</span>
+                        <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>{c.type}</span>
+                      </label>
+                    ))}
+                  </div>
+              }
             </div>
 
             {modal.id && modal.public_token && (
               <div className="form-group">
-                <label>Link dla wykładowcy</label>
+                <label>Link dla wykładowcy (dostępność)</label>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                   <input
                     readOnly
@@ -168,7 +184,7 @@ export default function LecturersPage() {
                     style={{ flex: 1, background: "#f9fafb", color: "#6b7280", fontSize: "0.8rem" }}
                     onClick={(e) => (e.target as HTMLInputElement).select()}
                   />
-                  <button className="btn-ghost" style={{ whiteSpace: "nowrap" }} onClick={() => copyLink(modal.public_token ?? null)}>
+                  <button className="btn-ghost" style={{ whiteSpace: "nowrap" }} onClick={() => copyLink(modal.public_token)}>
                     Kopiuj
                   </button>
                 </div>

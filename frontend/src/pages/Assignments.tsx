@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { assignments as api, courses, groups, lecturers } from "../api";
 import { Course, CourseAssignment, Lecturer, StudentGroup } from "../types";
 
-const EMPTY = { course_id: 0, lecturer_id: 0, group_id: 0, sessions_per_week: 1, blocks_per_session: 2 };
+const EMPTY = { course_id: 0, lecturer_id: 0, group_id: 0, sessions_per_week: 1 };
 
 export default function AssignmentsPage() {
   const [list, setList]             = useState<CourseAssignment[]>([]);
@@ -55,7 +55,7 @@ export default function AssignmentsPage() {
 
       <div className="card table-wrap">
         <table>
-          <thead><tr><th>Przedmiot</th><th>Wykładowca</th><th>Grupa</th><th>Sesji/tydzień</th><th>Bloków/sesję</th><th /></tr></thead>
+          <thead><tr><th>Przedmiot</th><th>Wykładowca</th><th>Grupa</th><th>Sesji/tydzień</th><th /></tr></thead>
           <tbody>
             {list.map((a) => (
               <tr key={a.id}>
@@ -63,7 +63,6 @@ export default function AssignmentsPage() {
                 <td>{a.lecturer.title} {a.lecturer.name}</td>
                 <td>{a.group.name}</td>
                 <td style={{ textAlign: "center" }}>{a.sessions_per_week}×</td>
-                <td style={{ textAlign: "center" }}>{a.blocks_per_session} blok(i)</td>
                 <td style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                   <button className="btn-ghost" onClick={() => setModal({ ...a })}>Edytuj</button>
                   <button className="btn-danger" onClick={() => remove(a.id)}>Usuń</button>
@@ -71,7 +70,7 @@ export default function AssignmentsPage() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak przypisań</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak przypisań</td></tr>
             )}
           </tbody>
         </table>
@@ -104,15 +103,9 @@ export default function AssignmentsPage() {
                 {groupList.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.size} os.)</option>)}
               </select>
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Sesji w tygodniu</label>
-                <input type="number" min={1} max={5} value={modal.sessions_per_week} onChange={(e) => setModal({ ...modal, sessions_per_week: Number(e.target.value) })} />
-              </div>
-              <div className="form-group">
-                <label>Bloków na sesję</label>
-                <input type="number" min={1} max={5} value={modal.blocks_per_session} onChange={(e) => setModal({ ...modal, blocks_per_session: Number(e.target.value) })} />
-              </div>
+            <div className="form-group">
+              <label>Sesji w tygodniu</label>
+              <input type="number" min={1} max={5} value={modal.sessions_per_week} onChange={(e) => setModal({ ...modal, sessions_per_week: Number(e.target.value) })} />
             </div>
 
             <div className="modal-actions">

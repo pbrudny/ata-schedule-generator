@@ -254,7 +254,7 @@ def list_assignments(db: Session = Depends(get_db)):
 
 @router.post("/assignments", response_model=CourseAssignmentOut, status_code=201)
 def create_assignment(body: CourseAssignmentCreate, db: Session = Depends(get_db)):
-    obj = CourseAssignment(**body.model_dump())
+    obj = CourseAssignment(**body.model_dump(), blocks_per_session=1)
     db.add(obj)
     db.commit()
     db.refresh(obj)

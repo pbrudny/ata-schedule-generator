@@ -84,7 +84,7 @@ class CourseAssignment(Base):
     lecturer_id = Column(Integer, ForeignKey("lecturers.id"), nullable=False)
     group_id = Column(Integer, ForeignKey("student_groups.id"), nullable=False)
     sessions_per_week = Column(Integer, default=1)
-    blocks_per_session = Column(Integer, default=2)
+    blocks_per_session = Column(Integer, default=1)
 
     course = relationship("Course", back_populates="assignments")
     lecturer = relationship("Lecturer", back_populates="assignments")

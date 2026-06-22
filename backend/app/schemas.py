@@ -137,7 +137,6 @@ class CourseAssignmentBase(BaseModel):
     lecturer_id: int
     group_id: int
     sessions_per_week: int = 1
-    blocks_per_session: int = 2
 
 
 class CourseAssignmentCreate(CourseAssignmentBase):
@@ -149,7 +148,6 @@ class CourseAssignmentUpdate(BaseModel):
     lecturer_id: Optional[int] = None
     group_id: Optional[int] = None
     sessions_per_week: Optional[int] = None
-    blocks_per_session: Optional[int] = None
 
 
 class CourseAssignmentOut(CourseAssignmentBase):

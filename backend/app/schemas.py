@@ -101,6 +101,9 @@ class CourseBase(BaseModel):
     priority: int = 1
     required_features: list[str] = []
     min_room_capacity: int = 0
+    can_be_online: bool = False
+    half_semester: bool = False
+    all_groups_together: bool = False
 
 
 class CourseCreate(CourseBase):
@@ -113,6 +116,9 @@ class CourseUpdate(BaseModel):
     priority: Optional[int] = None
     required_features: Optional[list[str]] = None
     min_room_capacity: Optional[int] = None
+    can_be_online: Optional[bool] = None
+    half_semester: Optional[bool] = None
+    all_groups_together: Optional[bool] = None
 
 
 class CourseOut(CourseBase):

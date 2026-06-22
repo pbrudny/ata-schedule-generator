@@ -57,6 +57,9 @@ class Course(Base):
     priority = Column(Integer, default=1)
     required_features = Column(JSON, default=list)
     min_room_capacity = Column(Integer, default=0)
+    can_be_online = Column(Boolean, default=False)
+    half_semester = Column(Boolean, default=False)
+    all_groups_together = Column(Boolean, default=False)
 
     assignments = relationship("CourseAssignment", back_populates="course")
 

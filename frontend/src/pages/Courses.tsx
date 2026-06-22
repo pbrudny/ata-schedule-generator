@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { courses as api } from "../api";
 import { Course, COURSE_TYPES, ROOM_FEATURES } from "../types";
 
-const EMPTY: Omit<Course, "id"> = { name: "", type: "wykład", priority: 1, required_features: [], min_room_capacity: 0 };
+const EMPTY: Omit<Course, "id"> = {
+  name: "", type: "wykład", priority: 1, required_features: [], min_room_capacity: 0,
+  can_be_online: false, half_semester: false, all_groups_together: false,
+};
 
 const FEATURE_LABELS: Record<string, string> = {
   projektor: "Projektor", tablica: "Tablica", lab_komputerowe: "Lab komputerowe",
@@ -12,6 +15,23 @@ const FEATURE_LABELS: Record<string, string> = {
 const TYPE_BADGES: Record<string, string> = {
   wykład: "badge", ćwiczenia: "badge badge-green", laboratorium: "badge badge-yellow", seminarium: "badge badge-red",
 };
+
+function Flag({ label }: { label: string }) {
+  return (
+    <span style={{ fontSize: "0.72rem", background: "#f0f9ff", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: "4px", padding: "1px 6px", whiteSpace: "nowrap" }}>
+      {label}
+    </span>
+  );
+}
+
+function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", color: "#374151" }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
+      {label}
+    </label>
+  );
+}
 
 export default function CoursesPage() {
   const [list, setList]     = useState<Course[]>([]);
@@ -55,7 +75,16 @@ export default function CoursesPage() {
 
       <div className="card table-wrap">
         <table>
-          <thead><tr><th>Nazwa</th><th>Typ</th><th>Priorytet</th><th>Wymagania</th><th /></tr></thead>
+          <thead>
+            <tr>
+              <th>Nazwa</th>
+              <th>Typ</th>
+              <th>Priorytet</th>
+              <th>Wymagania</th>
+              <th>Opcje</th>
+              <th />
+            </tr>
+          </thead>
           <tbody>
             {list.map((c) => (
               <tr key={c.id}>
@@ -66,6 +95,13 @@ export default function CoursesPage() {
                   {c.required_features.map((f) => FEATURE_LABELS[f] ?? f).join(", ") || "—"}
                   {c.min_room_capacity > 0 ? `, ≥${c.min_room_capacity} os.` : ""}
                 </td>
+                <td>
+                  <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                    {c.can_be_online      && <Flag label="Online" />}
+                    {c.half_semester      && <Flag label="Pół semestru" />}
+                    {c.all_groups_together && <Flag label="Wszystkie grupy" />}
+                  </div>
+                </td>
                 <td style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                   <button className="btn-ghost" onClick={() => setModal({ ...c })}>Edytuj</button>
                   <button className="btn-danger" onClick={() => remove(c.id)}>Usuń</button>
@@ -73,7 +109,7 @@ export default function CoursesPage() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak przedmiotów</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak przedmiotów</td></tr>
             )}
           </tbody>
         </table>
@@ -105,6 +141,7 @@ export default function CoursesPage() {
                 <input type="number" min={0} value={modal.min_room_capacity} onChange={(e) => setModal({ ...modal, min_room_capacity: Number(e.target.value) })} />
               </div>
             </div>
+
             <div className="form-group">
               <label>Wymagane wyposażenie sali</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "4px" }}>
@@ -117,6 +154,27 @@ export default function CoursesPage() {
                     fontSize: "0.8rem", cursor: "pointer",
                   }}>{FEATURE_LABELS[f] ?? f}</button>
                 ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Dodatkowe opcje</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "6px" }}>
+                <Checkbox
+                  checked={modal.can_be_online}
+                  onChange={(v) => setModal({ ...modal, can_be_online: v })}
+                  label="Możliwość zajęć online"
+                />
+                <Checkbox
+                  checked={modal.half_semester}
+                  onChange={(v) => setModal({ ...modal, half_semester: v })}
+                  label="Realizacja przez pół semestru"
+                />
+                <Checkbox
+                  checked={modal.all_groups_together}
+                  onChange={(v) => setModal({ ...modal, all_groups_together: v })}
+                  label="Wykład dla wszystkich grup jednocześnie"
+                />
               </div>
             </div>
 

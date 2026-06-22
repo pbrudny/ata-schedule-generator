@@ -36,6 +36,9 @@ export interface Course {
   priority: number;
   required_features: string[];
   min_room_capacity: number;
+  can_be_online: boolean;
+  half_semester: boolean;
+  all_groups_together: boolean;
 }
 
 export interface CourseAssignment {

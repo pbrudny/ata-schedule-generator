@@ -1,0 +1,339 @@
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import Optional
+
+from .database import Base, engine, get_db
+from .models import (
+    Course,
+    CourseAssignment,
+    Lecturer,
+    Room,
+    ScheduleEntry,
+    StudentGroup,
+)
+from .schemas import (
+    CourseAssignmentCreate,
+    CourseAssignmentOut,
+    CourseAssignmentUpdate,
+    CourseCreate,
+    CourseOut,
+    CourseUpdate,
+    GenerateResult,
+    LecturerCreate,
+    LecturerOut,
+    LecturerUpdate,
+    RoomCreate,
+    RoomOut,
+    RoomUpdate,
+    ScheduleEntryCreate,
+    ScheduleEntryOut,
+    ScheduleEntryUpdate,
+    StudentGroupCreate,
+    StudentGroupOut,
+    StudentGroupUpdate,
+)
+from .scheduler import generate_schedule
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="ATA Generator Planu Zajęć", root_path="/api")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+# ── Lecturers ─────────────────────────────────────────────────────────────────
+
+@app.get("/lecturers", response_model=list[LecturerOut])
+def list_lecturers(db: Session = Depends(get_db)):
+    return db.query(Lecturer).order_by(Lecturer.name).all()
+
+
+@app.post("/lecturers", response_model=LecturerOut, status_code=201)
+def create_lecturer(body: LecturerCreate, db: Session = Depends(get_db)):
+    obj = Lecturer(**body.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.get("/lecturers/{lecturer_id}", response_model=LecturerOut)
+def get_lecturer(lecturer_id: int, db: Session = Depends(get_db)):
+    obj = db.get(Lecturer, lecturer_id)
+    if not obj:
+        raise HTTPException(404, "Wykładowca nie istnieje")
+    return obj
+
+
+@app.put("/lecturers/{lecturer_id}", response_model=LecturerOut)
+def update_lecturer(lecturer_id: int, body: LecturerUpdate, db: Session = Depends(get_db)):
+    obj = db.get(Lecturer, lecturer_id)
+    if not obj:
+        raise HTTPException(404, "Wykładowca nie istnieje")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.delete("/lecturers/{lecturer_id}", status_code=204)
+def delete_lecturer(lecturer_id: int, db: Session = Depends(get_db)):
+    obj = db.get(Lecturer, lecturer_id)
+    if not obj:
+        raise HTTPException(404, "Wykładowca nie istnieje")
+    db.delete(obj)
+    db.commit()
+
+
+# ── Rooms ─────────────────────────────────────────────────────────────────────
+
+@app.get("/rooms", response_model=list[RoomOut])
+def list_rooms(db: Session = Depends(get_db)):
+    return db.query(Room).order_by(Room.name).all()
+
+
+@app.post("/rooms", response_model=RoomOut, status_code=201)
+def create_room(body: RoomCreate, db: Session = Depends(get_db)):
+    obj = Room(**body.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.get("/rooms/{room_id}", response_model=RoomOut)
+def get_room(room_id: int, db: Session = Depends(get_db)):
+    obj = db.get(Room, room_id)
+    if not obj:
+        raise HTTPException(404, "Sala nie istnieje")
+    return obj
+
+
+@app.put("/rooms/{room_id}", response_model=RoomOut)
+def update_room(room_id: int, body: RoomUpdate, db: Session = Depends(get_db)):
+    obj = db.get(Room, room_id)
+    if not obj:
+        raise HTTPException(404, "Sala nie istnieje")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.delete("/rooms/{room_id}", status_code=204)
+def delete_room(room_id: int, db: Session = Depends(get_db)):
+    obj = db.get(Room, room_id)
+    if not obj:
+        raise HTTPException(404, "Sala nie istnieje")
+    db.delete(obj)
+    db.commit()
+
+
+# ── Student Groups ────────────────────────────────────────────────────────────
+
+@app.get("/groups", response_model=list[StudentGroupOut])
+def list_groups(db: Session = Depends(get_db)):
+    return db.query(StudentGroup).order_by(StudentGroup.name).all()
+
+
+@app.post("/groups", response_model=StudentGroupOut, status_code=201)
+def create_group(body: StudentGroupCreate, db: Session = Depends(get_db)):
+    obj = StudentGroup(**body.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.get("/groups/{group_id}", response_model=StudentGroupOut)
+def get_group(group_id: int, db: Session = Depends(get_db)):
+    obj = db.get(StudentGroup, group_id)
+    if not obj:
+        raise HTTPException(404, "Grupa nie istnieje")
+    return obj
+
+
+@app.put("/groups/{group_id}", response_model=StudentGroupOut)
+def update_group(group_id: int, body: StudentGroupUpdate, db: Session = Depends(get_db)):
+    obj = db.get(StudentGroup, group_id)
+    if not obj:
+        raise HTTPException(404, "Grupa nie istnieje")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.delete("/groups/{group_id}", status_code=204)
+def delete_group(group_id: int, db: Session = Depends(get_db)):
+    obj = db.get(StudentGroup, group_id)
+    if not obj:
+        raise HTTPException(404, "Grupa nie istnieje")
+    db.delete(obj)
+    db.commit()
+
+
+# ── Courses ───────────────────────────────────────────────────────────────────
+
+@app.get("/courses", response_model=list[CourseOut])
+def list_courses(db: Session = Depends(get_db)):
+    return db.query(Course).order_by(Course.name).all()
+
+
+@app.post("/courses", response_model=CourseOut, status_code=201)
+def create_course(body: CourseCreate, db: Session = Depends(get_db)):
+    obj = Course(**body.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.get("/courses/{course_id}", response_model=CourseOut)
+def get_course(course_id: int, db: Session = Depends(get_db)):
+    obj = db.get(Course, course_id)
+    if not obj:
+        raise HTTPException(404, "Przedmiot nie istnieje")
+    return obj
+
+
+@app.put("/courses/{course_id}", response_model=CourseOut)
+def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_db)):
+    obj = db.get(Course, course_id)
+    if not obj:
+        raise HTTPException(404, "Przedmiot nie istnieje")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.delete("/courses/{course_id}", status_code=204)
+def delete_course(course_id: int, db: Session = Depends(get_db)):
+    obj = db.get(Course, course_id)
+    if not obj:
+        raise HTTPException(404, "Przedmiot nie istnieje")
+    db.delete(obj)
+    db.commit()
+
+
+# ── Course Assignments ────────────────────────────────────────────────────────
+
+@app.get("/assignments", response_model=list[CourseAssignmentOut])
+def list_assignments(db: Session = Depends(get_db)):
+    return db.query(CourseAssignment).all()
+
+
+@app.post("/assignments", response_model=CourseAssignmentOut, status_code=201)
+def create_assignment(body: CourseAssignmentCreate, db: Session = Depends(get_db)):
+    obj = CourseAssignment(**body.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.get("/assignments/{assignment_id}", response_model=CourseAssignmentOut)
+def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
+    obj = db.get(CourseAssignment, assignment_id)
+    if not obj:
+        raise HTTPException(404, "Przypisanie nie istnieje")
+    return obj
+
+
+@app.put("/assignments/{assignment_id}", response_model=CourseAssignmentOut)
+def update_assignment(assignment_id: int, body: CourseAssignmentUpdate, db: Session = Depends(get_db)):
+    obj = db.get(CourseAssignment, assignment_id)
+    if not obj:
+        raise HTTPException(404, "Przypisanie nie istnieje")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(obj, k, v)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.delete("/assignments/{assignment_id}", status_code=204)
+def delete_assignment(assignment_id: int, db: Session = Depends(get_db)):
+    obj = db.get(CourseAssignment, assignment_id)
+    if not obj:
+        raise HTTPException(404, "Przypisanie nie istnieje")
+    db.delete(obj)
+    db.commit()
+
+
+# ── Schedule ──────────────────────────────────────────────────────────────────
+
+@app.get("/schedule", response_model=list[ScheduleEntryOut])
+def list_schedule(
+    group_id: Optional[int] = None,
+    lecturer_id: Optional[int] = None,
+    room_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(ScheduleEntry)
+    if group_id is not None:
+        q = q.filter(ScheduleEntry.group_id == group_id)
+    if lecturer_id is not None:
+        q = q.filter(ScheduleEntry.lecturer_id == lecturer_id)
+    if room_id is not None:
+        q = q.filter(ScheduleEntry.room_id == room_id)
+    return q.order_by(ScheduleEntry.day, ScheduleEntry.block_start).all()
+
+
+@app.post("/schedule", response_model=ScheduleEntryOut, status_code=201)
+def create_entry(body: ScheduleEntryCreate, db: Session = Depends(get_db)):
+    obj = ScheduleEntry(**body.model_dump(), is_manual=True)
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.put("/schedule/{entry_id}", response_model=ScheduleEntryOut)
+def update_entry(entry_id: int, body: ScheduleEntryUpdate, db: Session = Depends(get_db)):
+    obj = db.get(ScheduleEntry, entry_id)
+    if not obj:
+        raise HTTPException(404, "Wpis nie istnieje")
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(obj, k, v)
+    obj.is_manual = True
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+@app.delete("/schedule/{entry_id}", status_code=204)
+def delete_entry(entry_id: int, db: Session = Depends(get_db)):
+    obj = db.get(ScheduleEntry, entry_id)
+    if not obj:
+        raise HTTPException(404, "Wpis nie istnieje")
+    db.delete(obj)
+    db.commit()
+
+
+@app.post("/schedule/generate", response_model=GenerateResult)
+def run_generate(db: Session = Depends(get_db)):
+    count, conflicts = generate_schedule(db)
+    return GenerateResult(entries_count=count, conflicts=conflicts)
+
+
+@app.delete("/schedule/clear", status_code=204)
+def clear_schedule(db: Session = Depends(get_db)):
+    db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
+    db.commit()

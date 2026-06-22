@@ -59,6 +59,12 @@ export const assignments = {
   remove: (id: number) => del(`/assignments/${id}`),
 };
 
+// Public availability (no auth — lecturer self-service)
+export const availability = {
+  get:    (token: string)                       => get(`/availability/${token}`),
+  submit: (token: string, b: unknown)           => put(`/availability/${token}`, b),
+};
+
 // Schedule
 export const schedule = {
   list:     (params?: Record<string, number>) => {

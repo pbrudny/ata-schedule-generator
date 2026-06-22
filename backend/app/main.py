@@ -16,6 +16,8 @@ from .models import (
     StudentGroup,
 )
 from .schemas import (
+    AvailabilityPublicOut,
+    AvailabilitySubmit,
     CourseAssignmentCreate,
     CourseAssignmentOut,
     CourseAssignmentUpdate,
@@ -342,6 +344,28 @@ def run_generate(db: Session = Depends(get_db)):
 def clear_schedule(db: Session = Depends(get_db)):
     db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
     db.commit()
+
+
+# ── Public availability form (no auth) ───────────────────────────────────────
+
+@router.get("/availability/{token}", response_model=AvailabilityPublicOut)
+def get_availability(token: str, db: Session = Depends(get_db)):
+    obj = db.query(Lecturer).filter(Lecturer.public_token == token).first()
+    if not obj:
+        raise HTTPException(404, "Nie znaleziono wykładowcy")
+    return obj
+
+
+@router.put("/availability/{token}", response_model=AvailabilityPublicOut)
+def submit_availability(token: str, body: AvailabilitySubmit, db: Session = Depends(get_db)):
+    obj = db.query(Lecturer).filter(Lecturer.public_token == token).first()
+    if not obj:
+        raise HTTPException(404, "Nie znaleziono wykładowcy")
+    obj.availability = body.availability
+    obj.preferences = body.preferences
+    db.commit()
+    db.refresh(obj)
+    return obj
 
 
 app.include_router(router)

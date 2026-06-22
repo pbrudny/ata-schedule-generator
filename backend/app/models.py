@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, JSON
+import uuid
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -13,6 +14,8 @@ class Lecturer(Base):
     title = Column(String(50), default="")
     # [{day: 0, blocks: [1,2,3,4,5]}, ...] — day 0=Pon..4=Pt, 5=Sob, 6=Nd
     availability = Column(JSON, default=list)
+    preferences = Column(Text, default="")
+    public_token = Column(String(36), unique=True, index=True, default=lambda: str(uuid.uuid4()))
 
     assignments = relationship("CourseAssignment", back_populates="lecturer")
     schedule_entries = relationship("ScheduleEntry", back_populates="lecturer")

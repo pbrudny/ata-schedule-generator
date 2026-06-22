@@ -9,6 +9,7 @@ class LecturerBase(BaseModel):
     email: str
     title: str = ""
     availability: list[Any] = []
+    preferences: str = ""
 
 
 class LecturerCreate(LecturerBase):
@@ -20,11 +21,26 @@ class LecturerUpdate(BaseModel):
     email: Optional[str] = None
     title: Optional[str] = None
     availability: Optional[list[Any]] = None
+    preferences: Optional[str] = None
 
 
 class LecturerOut(LecturerBase):
     id: int
+    public_token: Optional[str] = None
     model_config = {"from_attributes": True}
+
+
+class AvailabilityPublicOut(BaseModel):
+    name: str
+    title: str
+    availability: list[Any]
+    preferences: str
+    model_config = {"from_attributes": True}
+
+
+class AvailabilitySubmit(BaseModel):
+    availability: list[Any]
+    preferences: str = ""
 
 
 # ── Room ──────────────────────────────────────────────────────────────────────

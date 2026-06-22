@@ -3,11 +3,22 @@ import { lecturers as api } from "../api";
 import AvailabilityEditor from "../components/AvailabilityEditor";
 import { AvailabilitySlot, Lecturer } from "../types";
 
-const EMPTY: Omit<Lecturer, "id"> = { name: "", email: "", title: "", availability: [] };
+type ModalState = { id?: number; public_token?: string | null; name: string; email: string; title: string; availability: AvailabilitySlot[]; preferences: string };
+
+const EMPTY: ModalState = {
+  name: "", email: "", title: "", availability: [], preferences: "",
+};
+
+function copyLink(token: string | null | undefined) {
+  if (!token) return;
+  const url = `${window.location.origin}/dostepnosc/${token}`;
+  navigator.clipboard.writeText(url);
+}
 
 export default function LecturersPage() {
   const [list, setList]     = useState<Lecturer[]>([]);
-  const [modal, setModal]   = useState<Omit<Lecturer, "id"> & { id?: number } | null>(null);
+  const [modal, setModal]   = useState<ModalState | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
   const [error, setError]   = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -40,6 +51,12 @@ export default function LecturersPage() {
     load();
   };
 
+  const handleCopy = (l: Lecturer) => {
+    copyLink(l.public_token);
+    setCopied(l.id);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
@@ -55,6 +72,8 @@ export default function LecturersPage() {
               <th>Tytuł</th>
               <th>Email</th>
               <th>Dostępność</th>
+              <th>Preferencje</th>
+              <th>Link</th>
               <th />
             </tr>
           </thead>
@@ -69,6 +88,22 @@ export default function LecturersPage() {
                     ? <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>bez ograniczeń</span>
                     : <span className="badge">{l.availability.reduce((n, s) => n + s.blocks.length, 0)} bloków</span>}
                 </td>
+                <td style={{ maxWidth: "180px" }}>
+                  {l.preferences
+                    ? <span style={{ fontSize: "0.78rem", color: "#374151", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{l.preferences}</span>
+                    : <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>}
+                </td>
+                <td>
+                  {l.public_token && (
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}
+                      onClick={() => handleCopy(l)}
+                    >
+                      {copied === l.id ? "✓ Skopiowano" : "Kopiuj link"}
+                    </button>
+                  )}
+                </td>
                 <td style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                   <button className="btn-ghost" onClick={() => openEdit(l)}>Edytuj</button>
                   <button className="btn-danger" onClick={() => remove(l.id)}>Usuń</button>
@@ -76,7 +111,7 @@ export default function LecturersPage() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak wykładowców</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak wykładowców</td></tr>
             )}
           </tbody>
         </table>
@@ -111,6 +146,34 @@ export default function LecturersPage() {
                 onChange={(v) => setModal({ ...modal, availability: v })}
               />
             </div>
+
+            <div className="form-group">
+              <label>Preferencje</label>
+              <textarea
+                value={modal.preferences ?? ""}
+                onChange={(e) => setModal({ ...modal, preferences: e.target.value })}
+                rows={3}
+                placeholder="Preferencje podane przez wykładowcę..."
+                style={{ width: "100%", boxSizing: "border-box", padding: "0.5rem 0.6rem", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.875rem", resize: "vertical", fontFamily: "inherit" }}
+              />
+            </div>
+
+            {modal.id && modal.public_token && (
+              <div className="form-group">
+                <label>Link dla wykładowcy</label>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  <input
+                    readOnly
+                    value={`${window.location.origin}/dostepnosc/${modal.public_token}`}
+                    style={{ flex: 1, background: "#f9fafb", color: "#6b7280", fontSize: "0.8rem" }}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <button className="btn-ghost" style={{ whiteSpace: "nowrap" }} onClick={() => copyLink(modal.public_token ?? null)}>
+                    Kopiuj
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="modal-actions">
               <button className="btn-ghost" onClick={close}>Anuluj</button>

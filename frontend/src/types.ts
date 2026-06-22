@@ -4,6 +4,8 @@ export interface Lecturer {
   email: string;
   title: string;
   availability: AvailabilitySlot[];
+  preferences: string;
+  public_token: string | null;
 }
 
 export interface AvailabilitySlot {

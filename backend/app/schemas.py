@@ -75,7 +75,8 @@ class RoomOut(RoomBase):
 class StudentGroupBase(BaseModel):
     name: str
     size: int
-    year: int = 1
+    semester: int = 1
+    intake_season: str = "zimowy"
     study_mode: str = "stacjonarne"
 
 
@@ -86,7 +87,8 @@ class StudentGroupCreate(StudentGroupBase):
 class StudentGroupUpdate(BaseModel):
     name: Optional[str] = None
     size: Optional[int] = None
-    year: Optional[int] = None
+    semester: Optional[int] = None
+    intake_season: Optional[str] = None
     study_mode: Optional[str] = None
 
 

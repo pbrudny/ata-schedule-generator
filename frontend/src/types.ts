@@ -26,7 +26,8 @@ export interface StudentGroup {
   id: number;
   name: string;
   size: number;
-  year: number;
+  semester: number;
+  intake_season: string;
   study_mode: string;
 }
 
@@ -84,6 +85,7 @@ export const BLOCK_TIMES: Record<number, { start: string; end: string }> = {
 
 export const COURSE_TYPES = ["wykład", "ćwiczenia", "laboratorium", "seminarium"];
 export const STUDY_MODES = ["stacjonarne", "niestacjonarne"];
+export const INTAKE_SEASONS = ["zimowy", "letni"];
 export const ROOM_FEATURES = ["projektor", "tablica", "lab_komputerowe", "klimatyzacja", "nagłośnienie"];
 
 // Fixed reference week for FullCalendar (Monday = 2025-01-06)

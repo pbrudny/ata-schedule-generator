@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { groups as api } from "../api";
-import { StudentGroup, STUDY_MODES } from "../types";
+import { INTAKE_SEASONS, StudentGroup, STUDY_MODES } from "../types";
 
-const EMPTY: Omit<StudentGroup, "id"> = { name: "", size: 20, year: 1, study_mode: "stacjonarne" };
+const EMPTY: Omit<StudentGroup, "id"> = {
+  name: "", size: 20, semester: 1, intake_season: "zimowy", study_mode: "stacjonarne",
+};
 
 export default function GroupsPage() {
   const [list, setList]     = useState<StudentGroup[]>([]);
@@ -38,12 +40,26 @@ export default function GroupsPage() {
 
       <div className="card table-wrap">
         <table>
-          <thead><tr><th>Nazwa</th><th>Rok</th><th>Tryb</th><th>Liczba studentów</th><th /></tr></thead>
+          <thead>
+            <tr>
+              <th>Nazwa</th>
+              <th>Semestr</th>
+              <th>Nabór</th>
+              <th>Tryb</th>
+              <th>Liczba studentów</th>
+              <th />
+            </tr>
+          </thead>
           <tbody>
             {list.map((g) => (
               <tr key={g.id}>
                 <td style={{ fontWeight: 500 }}>{g.name}</td>
-                <td>{g.year}</td>
+                <td>{g.semester}</td>
+                <td>
+                  <span className={g.intake_season === "letni" ? "badge badge-yellow" : "badge"}>
+                    {g.intake_season}
+                  </span>
+                </td>
                 <td><span className="badge badge-green">{g.study_mode}</span></td>
                 <td>{g.size} os.</td>
                 <td style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
@@ -53,7 +69,7 @@ export default function GroupsPage() {
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak grup</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "#9ca3af", padding: "2rem" }}>Brak grup</td></tr>
             )}
           </tbody>
         </table>
@@ -71,9 +87,15 @@ export default function GroupsPage() {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Rok studiów</label>
-                <select value={modal.year} onChange={(e) => setModal({ ...modal, year: Number(e.target.value) })}>
-                  {[1,2,3,4,5].map((y) => <option key={y} value={y}>{y}</option>)}
+                <label>Semestr</label>
+                <select value={modal.semester} onChange={(e) => setModal({ ...modal, semester: Number(e.target.value) })}>
+                  {[1,2,3,4,5,6,7,8,9,10].map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Nabór</label>
+                <select value={modal.intake_season} onChange={(e) => setModal({ ...modal, intake_season: e.target.value })}>
+                  {INTAKE_SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div className="form-group">

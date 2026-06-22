@@ -49,7 +49,8 @@ class StudentGroup(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False)
     size = Column(Integer, nullable=False)
-    year = Column(Integer, default=1)
+    semester = Column(Integer, default=1)
+    intake_season = Column(String(10), default="zimowy")
     study_mode = Column(String(50), default="stacjonarne")
 
     assignments = relationship("CourseAssignment", back_populates="group")

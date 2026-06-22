@@ -1,5 +1,8 @@
+import os
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi import APIRouter
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -37,7 +40,7 @@ from .scheduler import generate_schedule
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="ATA Generator Planu Zajęć", root_path="/api")
+app = FastAPI(title="ATA Generator Planu Zajęć")
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,20 +49,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+router = APIRouter(prefix="/api")
 
-@app.get("/health")
+
+@router.get("/health")
 def health():
     return {"status": "ok"}
 
 
 # ── Lecturers ─────────────────────────────────────────────────────────────────
 
-@app.get("/lecturers", response_model=list[LecturerOut])
+@router.get("/lecturers", response_model=list[LecturerOut])
 def list_lecturers(db: Session = Depends(get_db)):
     return db.query(Lecturer).order_by(Lecturer.name).all()
 
 
-@app.post("/lecturers", response_model=LecturerOut, status_code=201)
+@router.post("/lecturers", response_model=LecturerOut, status_code=201)
 def create_lecturer(body: LecturerCreate, db: Session = Depends(get_db)):
     obj = Lecturer(**body.model_dump())
     db.add(obj)
@@ -68,7 +73,7 @@ def create_lecturer(body: LecturerCreate, db: Session = Depends(get_db)):
     return obj
 
 
-@app.get("/lecturers/{lecturer_id}", response_model=LecturerOut)
+@router.get("/lecturers/{lecturer_id}", response_model=LecturerOut)
 def get_lecturer(lecturer_id: int, db: Session = Depends(get_db)):
     obj = db.get(Lecturer, lecturer_id)
     if not obj:
@@ -76,7 +81,7 @@ def get_lecturer(lecturer_id: int, db: Session = Depends(get_db)):
     return obj
 
 
-@app.put("/lecturers/{lecturer_id}", response_model=LecturerOut)
+@router.put("/lecturers/{lecturer_id}", response_model=LecturerOut)
 def update_lecturer(lecturer_id: int, body: LecturerUpdate, db: Session = Depends(get_db)):
     obj = db.get(Lecturer, lecturer_id)
     if not obj:
@@ -88,7 +93,7 @@ def update_lecturer(lecturer_id: int, body: LecturerUpdate, db: Session = Depend
     return obj
 
 
-@app.delete("/lecturers/{lecturer_id}", status_code=204)
+@router.delete("/lecturers/{lecturer_id}", status_code=204)
 def delete_lecturer(lecturer_id: int, db: Session = Depends(get_db)):
     obj = db.get(Lecturer, lecturer_id)
     if not obj:
@@ -99,12 +104,12 @@ def delete_lecturer(lecturer_id: int, db: Session = Depends(get_db)):
 
 # ── Rooms ─────────────────────────────────────────────────────────────────────
 
-@app.get("/rooms", response_model=list[RoomOut])
+@router.get("/rooms", response_model=list[RoomOut])
 def list_rooms(db: Session = Depends(get_db)):
     return db.query(Room).order_by(Room.name).all()
 
 
-@app.post("/rooms", response_model=RoomOut, status_code=201)
+@router.post("/rooms", response_model=RoomOut, status_code=201)
 def create_room(body: RoomCreate, db: Session = Depends(get_db)):
     obj = Room(**body.model_dump())
     db.add(obj)
@@ -113,7 +118,7 @@ def create_room(body: RoomCreate, db: Session = Depends(get_db)):
     return obj
 
 
-@app.get("/rooms/{room_id}", response_model=RoomOut)
+@router.get("/rooms/{room_id}", response_model=RoomOut)
 def get_room(room_id: int, db: Session = Depends(get_db)):
     obj = db.get(Room, room_id)
     if not obj:
@@ -121,7 +126,7 @@ def get_room(room_id: int, db: Session = Depends(get_db)):
     return obj
 
 
-@app.put("/rooms/{room_id}", response_model=RoomOut)
+@router.put("/rooms/{room_id}", response_model=RoomOut)
 def update_room(room_id: int, body: RoomUpdate, db: Session = Depends(get_db)):
     obj = db.get(Room, room_id)
     if not obj:
@@ -133,7 +138,7 @@ def update_room(room_id: int, body: RoomUpdate, db: Session = Depends(get_db)):
     return obj
 
 
-@app.delete("/rooms/{room_id}", status_code=204)
+@router.delete("/rooms/{room_id}", status_code=204)
 def delete_room(room_id: int, db: Session = Depends(get_db)):
     obj = db.get(Room, room_id)
     if not obj:
@@ -144,12 +149,12 @@ def delete_room(room_id: int, db: Session = Depends(get_db)):
 
 # ── Student Groups ────────────────────────────────────────────────────────────
 
-@app.get("/groups", response_model=list[StudentGroupOut])
+@router.get("/groups", response_model=list[StudentGroupOut])
 def list_groups(db: Session = Depends(get_db)):
     return db.query(StudentGroup).order_by(StudentGroup.name).all()
 
 
-@app.post("/groups", response_model=StudentGroupOut, status_code=201)
+@router.post("/groups", response_model=StudentGroupOut, status_code=201)
 def create_group(body: StudentGroupCreate, db: Session = Depends(get_db)):
     obj = StudentGroup(**body.model_dump())
     db.add(obj)
@@ -158,7 +163,7 @@ def create_group(body: StudentGroupCreate, db: Session = Depends(get_db)):
     return obj
 
 
-@app.get("/groups/{group_id}", response_model=StudentGroupOut)
+@router.get("/groups/{group_id}", response_model=StudentGroupOut)
 def get_group(group_id: int, db: Session = Depends(get_db)):
     obj = db.get(StudentGroup, group_id)
     if not obj:
@@ -166,7 +171,7 @@ def get_group(group_id: int, db: Session = Depends(get_db)):
     return obj
 
 
-@app.put("/groups/{group_id}", response_model=StudentGroupOut)
+@router.put("/groups/{group_id}", response_model=StudentGroupOut)
 def update_group(group_id: int, body: StudentGroupUpdate, db: Session = Depends(get_db)):
     obj = db.get(StudentGroup, group_id)
     if not obj:
@@ -178,7 +183,7 @@ def update_group(group_id: int, body: StudentGroupUpdate, db: Session = Depends(
     return obj
 
 
-@app.delete("/groups/{group_id}", status_code=204)
+@router.delete("/groups/{group_id}", status_code=204)
 def delete_group(group_id: int, db: Session = Depends(get_db)):
     obj = db.get(StudentGroup, group_id)
     if not obj:
@@ -189,12 +194,12 @@ def delete_group(group_id: int, db: Session = Depends(get_db)):
 
 # ── Courses ───────────────────────────────────────────────────────────────────
 
-@app.get("/courses", response_model=list[CourseOut])
+@router.get("/courses", response_model=list[CourseOut])
 def list_courses(db: Session = Depends(get_db)):
     return db.query(Course).order_by(Course.name).all()
 
 
-@app.post("/courses", response_model=CourseOut, status_code=201)
+@router.post("/courses", response_model=CourseOut, status_code=201)
 def create_course(body: CourseCreate, db: Session = Depends(get_db)):
     obj = Course(**body.model_dump())
     db.add(obj)
@@ -203,7 +208,7 @@ def create_course(body: CourseCreate, db: Session = Depends(get_db)):
     return obj
 
 
-@app.get("/courses/{course_id}", response_model=CourseOut)
+@router.get("/courses/{course_id}", response_model=CourseOut)
 def get_course(course_id: int, db: Session = Depends(get_db)):
     obj = db.get(Course, course_id)
     if not obj:
@@ -211,7 +216,7 @@ def get_course(course_id: int, db: Session = Depends(get_db)):
     return obj
 
 
-@app.put("/courses/{course_id}", response_model=CourseOut)
+@router.put("/courses/{course_id}", response_model=CourseOut)
 def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_db)):
     obj = db.get(Course, course_id)
     if not obj:
@@ -223,7 +228,7 @@ def update_course(course_id: int, body: CourseUpdate, db: Session = Depends(get_
     return obj
 
 
-@app.delete("/courses/{course_id}", status_code=204)
+@router.delete("/courses/{course_id}", status_code=204)
 def delete_course(course_id: int, db: Session = Depends(get_db)):
     obj = db.get(Course, course_id)
     if not obj:
@@ -234,12 +239,12 @@ def delete_course(course_id: int, db: Session = Depends(get_db)):
 
 # ── Course Assignments ────────────────────────────────────────────────────────
 
-@app.get("/assignments", response_model=list[CourseAssignmentOut])
+@router.get("/assignments", response_model=list[CourseAssignmentOut])
 def list_assignments(db: Session = Depends(get_db)):
     return db.query(CourseAssignment).all()
 
 
-@app.post("/assignments", response_model=CourseAssignmentOut, status_code=201)
+@router.post("/assignments", response_model=CourseAssignmentOut, status_code=201)
 def create_assignment(body: CourseAssignmentCreate, db: Session = Depends(get_db)):
     obj = CourseAssignment(**body.model_dump())
     db.add(obj)
@@ -248,7 +253,7 @@ def create_assignment(body: CourseAssignmentCreate, db: Session = Depends(get_db
     return obj
 
 
-@app.get("/assignments/{assignment_id}", response_model=CourseAssignmentOut)
+@router.get("/assignments/{assignment_id}", response_model=CourseAssignmentOut)
 def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
     obj = db.get(CourseAssignment, assignment_id)
     if not obj:
@@ -256,7 +261,7 @@ def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
     return obj
 
 
-@app.put("/assignments/{assignment_id}", response_model=CourseAssignmentOut)
+@router.put("/assignments/{assignment_id}", response_model=CourseAssignmentOut)
 def update_assignment(assignment_id: int, body: CourseAssignmentUpdate, db: Session = Depends(get_db)):
     obj = db.get(CourseAssignment, assignment_id)
     if not obj:
@@ -268,7 +273,7 @@ def update_assignment(assignment_id: int, body: CourseAssignmentUpdate, db: Sess
     return obj
 
 
-@app.delete("/assignments/{assignment_id}", status_code=204)
+@router.delete("/assignments/{assignment_id}", status_code=204)
 def delete_assignment(assignment_id: int, db: Session = Depends(get_db)):
     obj = db.get(CourseAssignment, assignment_id)
     if not obj:
@@ -279,7 +284,7 @@ def delete_assignment(assignment_id: int, db: Session = Depends(get_db)):
 
 # ── Schedule ──────────────────────────────────────────────────────────────────
 
-@app.get("/schedule", response_model=list[ScheduleEntryOut])
+@router.get("/schedule", response_model=list[ScheduleEntryOut])
 def list_schedule(
     group_id: Optional[int] = None,
     lecturer_id: Optional[int] = None,
@@ -296,7 +301,7 @@ def list_schedule(
     return q.order_by(ScheduleEntry.day, ScheduleEntry.block_start).all()
 
 
-@app.post("/schedule", response_model=ScheduleEntryOut, status_code=201)
+@router.post("/schedule", response_model=ScheduleEntryOut, status_code=201)
 def create_entry(body: ScheduleEntryCreate, db: Session = Depends(get_db)):
     obj = ScheduleEntry(**body.model_dump(), is_manual=True)
     db.add(obj)
@@ -305,7 +310,7 @@ def create_entry(body: ScheduleEntryCreate, db: Session = Depends(get_db)):
     return obj
 
 
-@app.put("/schedule/{entry_id}", response_model=ScheduleEntryOut)
+@router.put("/schedule/{entry_id}", response_model=ScheduleEntryOut)
 def update_entry(entry_id: int, body: ScheduleEntryUpdate, db: Session = Depends(get_db)):
     obj = db.get(ScheduleEntry, entry_id)
     if not obj:
@@ -318,7 +323,7 @@ def update_entry(entry_id: int, body: ScheduleEntryUpdate, db: Session = Depends
     return obj
 
 
-@app.delete("/schedule/{entry_id}", status_code=204)
+@router.delete("/schedule/{entry_id}", status_code=204)
 def delete_entry(entry_id: int, db: Session = Depends(get_db)):
     obj = db.get(ScheduleEntry, entry_id)
     if not obj:
@@ -327,13 +332,21 @@ def delete_entry(entry_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
-@app.post("/schedule/generate", response_model=GenerateResult)
+@router.post("/schedule/generate", response_model=GenerateResult)
 def run_generate(db: Session = Depends(get_db)):
     count, conflicts = generate_schedule(db)
     return GenerateResult(entries_count=count, conflicts=conflicts)
 
 
-@app.delete("/schedule/clear", status_code=204)
+@router.delete("/schedule/clear", status_code=204)
 def clear_schedule(db: Session = Depends(get_db)):
     db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
     db.commit()
+
+
+app.include_router(router)
+
+# Serve React SPA — must come after API router
+static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.isdir(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

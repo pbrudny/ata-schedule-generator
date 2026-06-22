@@ -12,6 +12,8 @@ type ModalState = {
   course_ids: number[];
 };
 
+const TITLES = ["", "mgr", "dr", "dr hab.", "prof."];
+
 const EMPTY: ModalState = { name: "", email: "", title: "", preferences: "", course_ids: [] };
 
 function copyLink(token: string | null | undefined) {
@@ -140,7 +142,9 @@ export default function LecturersPage() {
             <div className="form-row">
               <div className="form-group">
                 <label>Tytuł</label>
-                <input value={modal.title} onChange={(e) => setModal({ ...modal, title: e.target.value })} placeholder="dr, prof., mgr..." />
+                <select value={modal.title} onChange={(e) => setModal({ ...modal, title: e.target.value })}>
+                  {TITLES.map((t) => <option key={t} value={t}>{t || "— brak —"}</option>)}
+                </select>
               </div>
               <div className="form-group" style={{ flex: 3 }}>
                 <label>Imię i nazwisko *</label>

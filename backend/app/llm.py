@@ -14,6 +14,48 @@ def _get_client() -> OpenAI:
     return _client
 
 
+def stream_validation(issues: list[dict], context: dict) -> Generator[str, None, None]:
+    """Stream LLM interpretation of validation issues before generation."""
+    errors   = [i for i in issues if i["severity"] == "error"]
+    warnings = [i for i in issues if i["severity"] == "warning"]
+
+    def fmt(issue: dict) -> str:
+        line = f"• [{issue['severity'].upper()}] {issue['category']}: {issue['message']}"
+        if issue.get("items"):
+            sample = issue["items"][:4]
+            line += "\n  - " + "\n  - ".join(sample)
+            if len(issue["items"]) > 4:
+                line += f"\n  - … i {len(issue['items']) - 4} więcej"
+        return line
+
+    issues_text = "\n".join(fmt(i) for i in issues) if issues else "Brak problemów."
+
+    prompt = f"""Jesteś agentem walidującym dane dziekanatu przed generowaniem planu zajęć uczelni.
+
+WYNIK WALIDACJI — {len(errors)} błędów, {len(warnings)} ostrzeżeń:
+{issues_text}
+
+KONTEKST:
+- Wykładowców: {context['lecturers_count']}, w tym bez dostępności: {context['no_avail_count']}
+- Sale: {context['rooms_count']}
+- Grup: {context['groups_count']}
+- Przypisań: {context['assignments_count']}
+
+Oceń sytuację po polsku, pisząc jak doświadczony administrator systemu. Zacznij od ogólnej oceny gotowości danych. Następnie omów najważniejsze problemy blokujące i ich wpływ na generowanie. Zakończ priorytetową listą działań do podjęcia. Bądź precyzyjny i zwięzły."""
+
+    stream = _get_client().chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=600,
+        temperature=0.3,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
 def stream_pre_analysis(context: dict) -> Generator[str, None, None]:
     """Stream LLM chain-of-thought analysis before OR-Tools runs."""
     assignments_text = "\n".join(

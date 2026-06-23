@@ -3,6 +3,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { useEffect, useRef, useState } from "react";
 import { groups as groupsApi, lecturers as lecturersApi, rooms as roomsApi, schedule as api } from "../api";
+import ValidationPanel from "../components/ValidationPanel";
 import {
   BLOCK_TIMES,
   DAYS_PL,
@@ -41,6 +42,7 @@ export default function SchedulePage() {
   const [rooms, setRooms]           = useState<Room[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("group");
   const [filterId, setFilterId]     = useState<number | "">("");
+  const [showValidation, setShowValidation] = useState(false);
   const [phase, setPhase]           = useState<Phase>("idle");
   const [thinking, setThinking]     = useState("");
   const [message, setMessage]       = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -151,11 +153,21 @@ export default function SchedulePage() {
     <div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
         <h1 style={{ fontSize: "1.25rem", fontWeight: 700, marginRight: "auto" }}>Plan zajęć</h1>
+        <button
+          className="btn-ghost"
+          onClick={() => setShowValidation(v => !v)}
+          style={{ fontSize: "0.85rem" }}
+        >
+          {showValidation ? "Ukryj walidację" : "Sprawdź dane"}
+        </button>
         <button className="btn-success" onClick={generate} disabled={generating} style={{ minWidth: "160px" }}>
           {generating ? (phase === "thinking" ? "Analiza AI…" : "Solver pracuje…") : "Generuj plan"}
         </button>
         <button className="btn-ghost" onClick={clearAuto} disabled={generating}>Wyczyść auto</button>
       </div>
+
+      {/* Validation panel */}
+      {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
 
       {/* AI thinking panel */}
       {(thinking || phase === "solving") && (

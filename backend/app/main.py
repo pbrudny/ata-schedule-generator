@@ -45,7 +45,8 @@ from .schemas import (
     StudentGroupUpdate,
 )
 from .scheduler import generate_schedule
-from .llm import suggest_adjustments, stream_pre_analysis
+from .llm import suggest_adjustments, stream_pre_analysis, stream_validation
+from .validator import validate as validate_schedule
 
 Base.metadata.create_all(bind=engine)
 
@@ -347,6 +348,38 @@ def delete_entry(entry_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Wpis nie istnieje")
     db.delete(obj)
     db.commit()
+
+
+@router.get("/schedule/validate/stream")
+def stream_validate(db: Session = Depends(get_db)):
+    issues = validate_schedule(db)
+    errors   = sum(1 for i in issues if i["severity"] == "error")
+    warnings = sum(1 for i in issues if i["severity"] == "warning")
+    no_avail = next(
+        (len(i.get("items", [])) for i in issues if i["category"] == "Dostępność wykładowców"), 0
+    )
+    context = {
+        "lecturers_count":  db.query(Lecturer).count(),
+        "rooms_count":      db.query(Room).count(),
+        "groups_count":     db.query(StudentGroup).count(),
+        "assignments_count": db.query(CourseAssignment).count(),
+        "no_avail_count":   no_avail,
+    }
+
+    def event_stream():
+        yield f"data: {json.dumps({'type': 'issues', 'issues': issues, 'errors': errors, 'warnings': warnings})}\n\n"
+        try:
+            for chunk in stream_validation(issues, context):
+                yield f"data: {json.dumps({'type': 'analysis', 'text': chunk})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'analysis', 'text': f'[Analiza niedostępna: {exc}]'})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/schedule/generate/stream")

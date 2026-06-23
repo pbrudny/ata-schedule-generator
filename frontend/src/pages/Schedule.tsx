@@ -299,10 +299,10 @@ export default function SchedulePage() {
             return DAYS_PL[idx] ?? arg.text;
           }}
           hiddenDays={[0, 6]}
-          slotMinTime="07:50:00"
+          slotMinTime="08:00:00"
           slotMaxTime="17:10:00"
           slotDuration="00:10:00"
-          slotLabelInterval="00:30:00"
+          slotLabelInterval="01:50:00"
           slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
           height="auto"
           events={entries.map(entryToEvent)}

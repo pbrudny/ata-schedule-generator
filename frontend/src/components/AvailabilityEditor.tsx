@@ -61,7 +61,7 @@ export default function AvailabilityEditor({ value, onChange }: Props) {
         ))}
       </div>
       <p style={{ fontSize: "0.7rem", color: "#9ca3af", marginTop: "6px" }}>
-        Kliknij komórkę aby zaznaczyć dostępność. Puste = brak ograniczeń.
+        Kliknij komórkę aby zaznaczyć dostępność.
       </p>
     </div>
   );

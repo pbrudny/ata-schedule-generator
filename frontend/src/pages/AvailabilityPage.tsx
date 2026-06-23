@@ -118,7 +118,7 @@ export default function AvailabilityPage() {
             Dzień dobry, {data?.title ? `${data.title} ` : ""}{data?.name}!
           </h1>
           <p style={{ margin: "0.5rem 0 0", color: "#6b7280", fontSize: "0.875rem" }}>
-            Zaznacz bloki, w których <strong>możesz</strong> prowadzić zajęcia. Puste = brak ograniczeń.
+            Zaznacz bloki, w których <strong>możesz</strong> prowadzić zajęcia.
           </p>
         </div>
 

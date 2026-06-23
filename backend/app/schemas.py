@@ -132,29 +132,28 @@ class CourseOut(CourseBase):
 
 # ── CourseAssignment ──────────────────────────────────────────────────────────
 
-class CourseAssignmentBase(BaseModel):
+class CourseAssignmentCreate(BaseModel):
     course_id: int
     lecturer_id: int
-    group_id: int
+    group_ids: list[int]
     sessions_per_week: int = 1
-
-
-class CourseAssignmentCreate(CourseAssignmentBase):
-    pass
 
 
 class CourseAssignmentUpdate(BaseModel):
     course_id: Optional[int] = None
     lecturer_id: Optional[int] = None
-    group_id: Optional[int] = None
+    group_ids: Optional[list[int]] = None
     sessions_per_week: Optional[int] = None
 
 
-class CourseAssignmentOut(CourseAssignmentBase):
+class CourseAssignmentOut(BaseModel):
     id: int
+    course_id: int
+    lecturer_id: int
+    sessions_per_week: int
     course: CourseOut
     lecturer: LecturerOut
-    group: StudentGroupOut
+    groups: list[StudentGroupOut] = []
     model_config = {"from_attributes": True}
 
 

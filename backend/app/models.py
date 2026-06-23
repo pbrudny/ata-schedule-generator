@@ -12,6 +12,13 @@ lecturer_courses = Table(
     Column("course_id",   Integer, ForeignKey("courses.id",   ondelete="CASCADE"), primary_key=True),
 )
 
+assignment_groups = Table(
+    "assignment_groups",
+    Base.metadata,
+    Column("assignment_id", Integer, ForeignKey("course_assignments.id", ondelete="CASCADE"), primary_key=True),
+    Column("group_id",      Integer, ForeignKey("student_groups.id",     ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Lecturer(Base):
     __tablename__ = "lecturers"
@@ -53,7 +60,6 @@ class StudentGroup(Base):
     intake_season = Column(String(10), default="zimowy")
     study_mode = Column(String(50), default="stacjonarne")
 
-    assignments = relationship("CourseAssignment", back_populates="group")
     schedule_entries = relationship("ScheduleEntry", back_populates="group")
 
 
@@ -75,20 +81,19 @@ class Course(Base):
 
 
 class CourseAssignment(Base):
-    """Defines what must be scheduled: which lecturer teaches which course to which group."""
+    """Defines what must be scheduled: which lecturer teaches which course to which groups."""
 
     __tablename__ = "course_assignments"
 
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     lecturer_id = Column(Integer, ForeignKey("lecturers.id"), nullable=False)
-    group_id = Column(Integer, ForeignKey("student_groups.id"), nullable=False)
     sessions_per_week = Column(Integer, default=1)
     blocks_per_session = Column(Integer, default=1)
 
     course = relationship("Course", back_populates="assignments")
     lecturer = relationship("Lecturer", back_populates="assignments")
-    group = relationship("StudentGroup", back_populates="assignments")
+    groups = relationship("StudentGroup", secondary=assignment_groups, lazy="select")
     schedule_entries = relationship("ScheduleEntry", back_populates="assignment")
 
 

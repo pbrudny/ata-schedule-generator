@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from .models import CourseAssignment, Room, ScheduleEntry
 
-DAYS = 5  # Pon–Pt (0..4)
+DAYS = 5   # Pon–Pt (0..4)
 BLOCKS = 5  # bloki 1..5
 
 
@@ -22,96 +22,95 @@ def generate_schedule(db: Session) -> tuple[int, list[str]]:
     if not rooms:
         return 0, ["Brak sal. Dodaj sale przed generowaniem planu."]
 
+    # Expand to flat task list: one task per (assignment, group, session)
+    tasks = []  # list of (assignment, group, session_idx)
+    for a in assignments:
+        for g in a.groups:
+            for s in range(a.sessions_per_week):
+                tasks.append((a, g, s))
+
+    if not tasks:
+        return 0, ["Przypisania nie mają przypisanych grup. Dodaj grupy do przypisań."]
+
     model = cp_model.CpModel()
 
-    # slot_vars[(a_idx, s)] = (day_var, block_var, room_var, end_var)
-    slot_vars: dict = {}
+    slot_vars: dict[int, tuple] = {}  # t_idx → (day_var, block_var, room_var, end_var)
 
-    for a_idx, a in enumerate(assignments):
+    for t_idx, (a, g, s) in enumerate(tasks):
         max_start = BLOCKS - a.blocks_per_session + 1
         if max_start < 1:
             return 0, [
-                f"Przypisanie {a.course.name} / {a.group.name}: "
+                f"Przypisanie {a.course.name} / {g.name}: "
                 f"liczba bloków na sesję ({a.blocks_per_session}) przekracza dostępne bloki."
             ]
 
-        # Which rooms are compatible for this assignment?
         valid_room_indices = [
             r_idx
             for r_idx, room in enumerate(rooms)
-            if room.capacity >= max(a.group.size, a.course.min_room_capacity)
+            if room.capacity >= max(g.size, a.course.min_room_capacity)
             and all(f in (room.features or []) for f in (a.course.required_features or []))
         ]
         if not valid_room_indices:
             return 0, [
-                f"Brak odpowiedniej sali dla: {a.course.name} / {a.group.name} "
-                f"(pojemność ≥ {a.group.size}, wyposażenie: {a.course.required_features})"
+                f"Brak odpowiedniej sali dla: {a.course.name} / {g.name} "
+                f"(pojemność ≥ {g.size}, wyposażenie: {a.course.required_features})"
             ]
 
-        for s in range(a.sessions_per_week):
-            day_var = model.new_int_var(0, DAYS - 1, f"d_{a_idx}_{s}")
-            block_var = model.new_int_var(1, max_start, f"b_{a_idx}_{s}")
-            room_var = model.new_int_var(0, len(rooms) - 1, f"r_{a_idx}_{s}")
-            end_var = model.new_int_var(2, BLOCKS + 1, f"e_{a_idx}_{s}")
+        day_var   = model.new_int_var(0, DAYS - 1,      f"d_{t_idx}")
+        block_var = model.new_int_var(1, max_start,      f"b_{t_idx}")
+        room_var  = model.new_int_var(0, len(rooms) - 1, f"r_{t_idx}")
+        end_var   = model.new_int_var(2, BLOCKS + 1,     f"e_{t_idx}")
 
-            model.add(end_var == block_var + a.blocks_per_session)
-            model.add_allowed_assignments([room_var], [[i] for i in valid_room_indices])
+        model.add(end_var == block_var + a.blocks_per_session)
+        model.add_allowed_assignments([room_var], [[i] for i in valid_room_indices])
 
-            # Lecturer availability: restrict (day, block_start) to allowed pairs
-            avail = a.lecturer.availability or []
-            if avail:
-                allowed_pairs = [
-                    (slot["day"], b)
-                    for slot in avail
-                    for b in slot.get("blocks", [])
-                    if 0 <= slot["day"] < DAYS and 1 <= b <= max_start
-                ]
-                if allowed_pairs:
-                    model.add_allowed_assignments([day_var, block_var], allowed_pairs)
+        avail = a.lecturer.availability or []
+        if avail:
+            allowed_pairs = [
+                (slot["day"], b)
+                for slot in avail
+                for b in slot.get("blocks", [])
+                if 0 <= slot["day"] < DAYS and 1 <= b <= max_start
+            ]
+            if allowed_pairs:
+                model.add_allowed_assignments([day_var, block_var], allowed_pairs)
 
-            slot_vars[(a_idx, s)] = (day_var, block_var, room_var, end_var)
+        slot_vars[t_idx] = (day_var, block_var, room_var, end_var)
 
     # Build optional intervals for no-overlap constraints
-    # lecturer_intervals[(lecturer_id, day)] and group/room equivalents
     lect_intervals: dict[tuple, list] = {}
     group_intervals: dict[tuple, list] = {}
     room_intervals: dict[tuple, list] = {}
 
-    for a_idx, a in enumerate(assignments):
-        for s in range(a.sessions_per_week):
-            day_var, block_var, room_var, end_var = slot_vars[(a_idx, s)]
-            dur = a.blocks_per_session
+    for t_idx, (a, g, s) in enumerate(tasks):
+        day_var, block_var, room_var, end_var = slot_vars[t_idx]
+        dur = a.blocks_per_session
 
-            for d in range(DAYS):
-                is_day = model.new_bool_var(f"isday_{a_idx}_{s}_{d}")
-                model.add(day_var == d).only_enforce_if(is_day)
-                model.add(day_var != d).only_enforce_if(is_day.Not())
+        for d in range(DAYS):
+            is_day = model.new_bool_var(f"isday_{t_idx}_{d}")
+            model.add(day_var == d).only_enforce_if(is_day)
+            model.add(day_var != d).only_enforce_if(is_day.Not())
 
-                lect_key = (a.lecturer_id, d)
-                lect_intervals.setdefault(lect_key, []).append(
-                    model.new_optional_interval_var(block_var, dur, end_var, is_day, f"li_{a_idx}_{s}_{d}")
+            lect_intervals.setdefault((a.lecturer_id, d), []).append(
+                model.new_optional_interval_var(block_var, dur, end_var, is_day, f"li_{t_idx}_{d}")
+            )
+            group_intervals.setdefault((g.id, d), []).append(
+                model.new_optional_interval_var(block_var, dur, end_var, is_day, f"gi_{t_idx}_{d}")
+            )
+
+            for r_idx in range(len(rooms)):
+                is_room = model.new_bool_var(f"isrm_{t_idx}_{r_idx}")
+                model.add(room_var == r_idx).only_enforce_if(is_room)
+                model.add(room_var != r_idx).only_enforce_if(is_room.Not())
+
+                is_day_room = model.new_bool_var(f"isdr_{t_idx}_{d}_{r_idx}")
+                model.add_bool_and([is_day, is_room]).only_enforce_if(is_day_room)
+                model.add_bool_or([is_day.Not(), is_room.Not()]).only_enforce_if(is_day_room.Not())
+
+                room_intervals.setdefault((r_idx, d), []).append(
+                    model.new_optional_interval_var(block_var, dur, end_var, is_day_room, f"ri_{t_idx}_{d}_{r_idx}")
                 )
 
-                grp_key = (a.group_id, d)
-                group_intervals.setdefault(grp_key, []).append(
-                    model.new_optional_interval_var(block_var, dur, end_var, is_day, f"gi_{a_idx}_{s}_{d}")
-                )
-
-                for r_idx in range(len(rooms)):
-                    is_room = model.new_bool_var(f"isrm_{a_idx}_{s}_{r_idx}")
-                    model.add(room_var == r_idx).only_enforce_if(is_room)
-                    model.add(room_var != r_idx).only_enforce_if(is_room.Not())
-
-                    is_day_room = model.new_bool_var(f"isdr_{a_idx}_{s}_{d}_{r_idx}")
-                    model.add_bool_and([is_day, is_room]).only_enforce_if(is_day_room)
-                    model.add_bool_or([is_day.Not(), is_room.Not()]).only_enforce_if(is_day_room.Not())
-
-                    rm_key = (r_idx, d)
-                    room_intervals.setdefault(rm_key, []).append(
-                        model.new_optional_interval_var(block_var, dur, end_var, is_day_room, f"ri_{a_idx}_{s}_{r_idx}_{d}")
-                    )
-
-    # No-overlap constraints
     for intervals in lect_intervals.values():
         if len(intervals) > 1:
             model.add_no_overlap(intervals)
@@ -122,19 +121,18 @@ def generate_schedule(db: Session) -> tuple[int, list[str]]:
         if len(intervals) > 1:
             model.add_no_overlap(intervals)
 
-    # Multiple sessions of the same assignment must fall on different days
-    for a_idx, a in enumerate(assignments):
-        for s1 in range(a.sessions_per_week):
-            for s2 in range(s1 + 1, a.sessions_per_week):
-                model.add(slot_vars[(a_idx, s1)][0] != slot_vars[(a_idx, s2)][0])
+    # Sessions of the same (assignment, group) must fall on different days
+    task_key_indices: dict[tuple, list[int]] = {}
+    for t_idx, (a, g, s) in enumerate(tasks):
+        task_key_indices.setdefault((a.id, g.id), []).append(t_idx)
 
-    # Soft objective: minimize total block_start values (earlier = compacter days)
-    total_blocks = []
-    for a_idx, a in enumerate(assignments):
-        for s in range(a.sessions_per_week):
-            _, block_var, _, _ = slot_vars[(a_idx, s)]
-            total_blocks.append(block_var)
-    model.minimize(sum(total_blocks))
+    for indices in task_key_indices.values():
+        for i in range(len(indices)):
+            for j in range(i + 1, len(indices)):
+                model.add(slot_vars[indices[i]][0] != slot_vars[indices[j]][0])
+
+    # Soft objective: minimize total block_start (pack earlier in the day)
+    model.minimize(sum(slot_vars[t][1] for t in range(len(tasks))))
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 30.0
@@ -146,27 +144,25 @@ def generate_schedule(db: Session) -> tuple[int, list[str]]:
             "Sprawdź dostępność wykładowców, pojemność sal i liczbę przypisań."
         ]
 
-    # Clear previous auto-generated entries and persist new ones
     db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
 
     count = 0
-    for a_idx, a in enumerate(assignments):
-        for s in range(a.sessions_per_week):
-            day_var, block_var, room_var, _ = slot_vars[(a_idx, s)]
-            block_start = solver.value(block_var)
-            entry = ScheduleEntry(
-                assignment_id=a.id,
-                course_id=a.course_id,
-                lecturer_id=a.lecturer_id,
-                room_id=rooms[solver.value(room_var)].id,
-                group_id=a.group_id,
-                day=solver.value(day_var),
-                block_start=block_start,
-                block_end=block_start + a.blocks_per_session - 1,
-                is_manual=False,
-            )
-            db.add(entry)
-            count += 1
+    for t_idx, (a, g, s) in enumerate(tasks):
+        day_var, block_var, room_var, _ = slot_vars[t_idx]
+        block_start = solver.value(block_var)
+        entry = ScheduleEntry(
+            assignment_id=a.id,
+            course_id=a.course_id,
+            lecturer_id=a.lecturer_id,
+            room_id=rooms[solver.value(room_var)].id,
+            group_id=g.id,
+            day=solver.value(day_var),
+            block_start=block_start,
+            block_end=block_start + a.blocks_per_session - 1,
+            is_manual=False,
+        )
+        db.add(entry)
+        count += 1
 
     db.commit()
     return count, []

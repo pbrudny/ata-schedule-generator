@@ -255,7 +255,9 @@ def list_assignments(db: Session = Depends(get_db)):
 
 @router.post("/assignments", response_model=CourseAssignmentOut, status_code=201)
 def create_assignment(body: CourseAssignmentCreate, db: Session = Depends(get_db)):
-    obj = CourseAssignment(**body.model_dump(), blocks_per_session=1)
+    obj = CourseAssignment(**body.model_dump(exclude={"group_ids"}), blocks_per_session=1)
+    if body.group_ids:
+        obj.groups = db.query(StudentGroup).filter(StudentGroup.id.in_(body.group_ids)).all()
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -275,8 +277,10 @@ def update_assignment(assignment_id: int, body: CourseAssignmentUpdate, db: Sess
     obj = db.get(CourseAssignment, assignment_id)
     if not obj:
         raise HTTPException(404, "Przypisanie nie istnieje")
-    for k, v in body.model_dump(exclude_none=True).items():
+    for k, v in body.model_dump(exclude_none=True, exclude={"group_ids"}).items():
         setattr(obj, k, v)
+    if body.group_ids is not None:
+        obj.groups = db.query(StudentGroup).filter(StudentGroup.id.in_(body.group_ids)).all()
     db.commit()
     db.refresh(obj)
     return obj

@@ -47,12 +47,10 @@ export interface CourseAssignment {
   id: number;
   course_id: number;
   lecturer_id: number;
-  group_id: number;
   sessions_per_week: number;
-  blocks_per_session: number;
   course: Course;
   lecturer: Lecturer;
-  group: StudentGroup;
+  groups: StudentGroup[];
 }
 
 export interface ScheduleEntry {

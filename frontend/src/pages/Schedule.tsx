@@ -4,6 +4,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { useEffect, useRef, useState } from "react";
 import { groups as groupsApi, lecturers as lecturersApi, rooms as roomsApi, schedule as api } from "../api";
 import ValidationPanel from "../components/ValidationPanel";
+import AgentPanel from "../components/AgentPanel";
 import {
   BLOCK_TIMES,
   DAYS_PL,
@@ -43,6 +44,7 @@ export default function SchedulePage() {
   const [filterMode, setFilterMode] = useState<FilterMode>("group");
   const [filterId, setFilterId]     = useState<number | "">("");
   const [showValidation, setShowValidation] = useState(false);
+  const [showAgent, setShowAgent]           = useState(false);
   const [phase, setPhase]           = useState<Phase>("idle");
   const [thinking, setThinking]     = useState("");
   const [message, setMessage]       = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -160,6 +162,13 @@ export default function SchedulePage() {
         >
           {showValidation ? "Ukryj walidację" : "Sprawdź dane"}
         </button>
+        <button
+          className="btn-ghost"
+          onClick={() => setShowAgent(v => !v)}
+          style={{ fontSize: "0.85rem" }}
+        >
+          {showAgent ? "Ukryj agenta" : "Agent AI"}
+        </button>
         <button className="btn-success" onClick={generate} disabled={generating} style={{ minWidth: "160px" }}>
           {generating ? (phase === "thinking" ? "Analiza AI…" : "Solver pracuje…") : "Generuj plan"}
         </button>
@@ -168,6 +177,14 @@ export default function SchedulePage() {
 
       {/* Validation panel */}
       {showValidation && <ValidationPanel onClose={() => setShowValidation(false)} />}
+
+      {/* Agent solve panel */}
+      {showAgent && (
+        <AgentPanel
+          onClose={() => setShowAgent(false)}
+          onSuccess={loadSchedule}
+        />
+      )}
 
       {/* AI thinking panel */}
       {(thinking || phase === "solving") && (

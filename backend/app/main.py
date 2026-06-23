@@ -20,6 +20,7 @@ from .models import (
     StudentGroup,
 )
 from .schemas import (
+    AgentSolveRevert,
     AvailabilityPublicOut,
     AvailabilitySubmit,
     CourseAssignmentCreate,
@@ -47,6 +48,7 @@ from .schemas import (
 from .scheduler import generate_schedule
 from .llm import suggest_adjustments, stream_pre_analysis, stream_validation
 from .validator import validate as validate_schedule
+from .agent import agent_solve_stream as _agent_solve_stream
 
 Base.metadata.create_all(bind=engine)
 
@@ -519,6 +521,38 @@ def run_generate(db: Session = Depends(get_db)):
 def clear_schedule(db: Session = Depends(get_db)):
     db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
     db.commit()
+
+
+@router.post("/schedule/agent-solve/stream")
+def agent_solve_stream_endpoint(db: Session = Depends(get_db)):
+    return StreamingResponse(
+        _agent_solve_stream(db),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/schedule/agent-solve/revert")
+def agent_solve_revert(body: AgentSolveRevert, db: Session = Depends(get_db)):
+    from .models import CourseAssignment as CA, Course as C, StudentGroup as SG
+    for change in reversed(body.changes):
+        if change["type"] == "mark_online":
+            c = db.get(C, change["course_id"])
+            if c:
+                c.can_be_online = change["was"]
+        elif change["type"] == "remove_assignment":
+            d = change["data"]
+            a = CA(
+                course_id=d["course_id"],
+                lecturer_id=d["lecturer_id"],
+                sessions_per_week=d["sessions_per_week"],
+                blocks_per_session=d["blocks_per_session"],
+            )
+            a.groups = db.query(SG).filter(SG.id.in_(d["group_ids"])).all()
+            db.add(a)
+    db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
+    db.commit()
+    return {"reverted": len(body.changes)}
 
 
 # ── Generation history ────────────────────────────────────────────────────────

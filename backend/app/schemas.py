@@ -222,3 +222,9 @@ class GenerationAttemptOut(BaseModel):
 
 class GenerationAttemptNotesUpdate(BaseModel):
     notes: str
+
+
+# ── Agent solve ───────────────────────────────────────────────────────────────
+
+class AgentSolveRevert(BaseModel):
+    changes: list[dict]

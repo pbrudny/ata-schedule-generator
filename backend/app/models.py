@@ -104,7 +104,7 @@ class ScheduleEntry(Base):
     assignment_id = Column(Integer, ForeignKey("course_assignments.id"), nullable=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     lecturer_id = Column(Integer, ForeignKey("lecturers.id"), nullable=False)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=True)  # NULL = online
     group_id = Column(Integer, ForeignKey("student_groups.id"), nullable=False)
     # 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd
     day = Column(Integer, nullable=False)

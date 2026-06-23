@@ -162,7 +162,7 @@ class CourseAssignmentOut(BaseModel):
 class ScheduleEntryBase(BaseModel):
     course_id: int
     lecturer_id: int
-    room_id: int
+    room_id: Optional[int] = None
     group_id: int
     day: int
     block_start: int
@@ -187,7 +187,7 @@ class ScheduleEntryOut(ScheduleEntryBase):
     id: int
     course: CourseOut
     lecturer: LecturerOut
-    room: RoomOut
+    room: Optional[RoomOut] = None
     group: StudentGroupOut
     model_config = {"from_attributes": True}
 

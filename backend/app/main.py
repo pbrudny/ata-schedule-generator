@@ -390,6 +390,9 @@ def stream_generate(db: Session = Depends(get_db)):
                 "groups": db.query(StudentGroup).count(),
                 "assignments": len(all_assignments),
                 "available_slots": len(all_rooms) * 5 * 5,
+                "online_capable_courses": [
+                    a.course.name for a in all_assignments if a.course.can_be_online
+                ],
             }
             try:
                 suggestions = suggest_adjustments(conflicts, solver_context)
@@ -416,6 +419,9 @@ def run_generate(db: Session = Depends(get_db)):
             "groups": db.query(StudentGroup).count(),
             "assignments": db.query(CourseAssignment).count(),
             "available_slots": db.query(Room).count() * 5 * 5,
+            "online_capable_courses": [
+                a.course.name for a in db.query(CourseAssignment).all() if a.course.can_be_online
+            ],
         }
         try:
             suggestions = suggest_adjustments(conflicts, context)

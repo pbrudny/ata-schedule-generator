@@ -20,10 +20,12 @@ function entryToEvent(entry: ScheduleEntry) {
   const date = entryToDate(entry.day);
   const start = `${date}T${BLOCK_TIMES[entry.block_start].start}`;
   const end   = `${date}T${BLOCK_TIMES[entry.block_end].end}`;
-  const color = entry.is_manual ? "#7c3aed" : "#2563eb";
+  const isOnline = entry.room === null;
+  const color = entry.is_manual ? "#7c3aed" : isOnline ? "#059669" : "#2563eb";
+  const roomLabel = isOnline ? "Online" : entry.room!.name;
   return {
     id: String(entry.id),
-    title: `${entry.course.name}\n${entry.lecturer.title} ${entry.lecturer.name}\n${entry.room.name}`,
+    title: `${entry.course.name}\n${entry.lecturer.title} ${entry.lecturer.name}\n${roomLabel}`,
     start,
     end,
     backgroundColor: color,
@@ -243,6 +245,10 @@ export default function SchedulePage() {
         <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={{ width: 14, height: 14, background: "#2563eb", borderRadius: 3, display: "inline-block" }} />
           Automatyczny
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ width: 14, height: 14, background: "#059669", borderRadius: 3, display: "inline-block" }} />
+          Online
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={{ width: 14, height: 14, background: "#7c3aed", borderRadius: 3, display: "inline-block" }} />

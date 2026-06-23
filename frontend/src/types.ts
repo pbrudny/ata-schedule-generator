@@ -57,7 +57,7 @@ export interface ScheduleEntry {
   id: number;
   course_id: number;
   lecturer_id: number;
-  room_id: number;
+  room_id: number | null;
   group_id: number;
   day: number;
   block_start: number;
@@ -66,7 +66,7 @@ export interface ScheduleEntry {
   assignment_id: number | null;
   course: Course;
   lecturer: Lecturer;
-  room: Room;
+  room: Room | null;
   group: StudentGroup;
 }
 

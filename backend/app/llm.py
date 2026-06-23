@@ -48,6 +48,11 @@ Analizuj dane myśląc głośno po polsku. Wskaż potencjalne wąskie gardła, k
 
 
 def suggest_adjustments(conflicts: list[str], context: dict) -> str:
+    online_hint = ""
+    if context.get("online_capable_courses"):
+        names = ", ".join(context["online_capable_courses"])
+        online_hint = f"\nPrzedmioty oznaczone jako możliwe do realizacji online (algorytm już próbował je online, ale nadal nie udało się wygenerować planu): {names}"
+
     prompt = f"""Jesteś asystentem dziekanatu uczelni wyższej. Generator planu zajęć nie mógł wygenerować pełnego planu.
 
 DANE WEJŚCIOWE:
@@ -55,12 +60,12 @@ DANE WEJŚCIOWE:
 - Sale: {context['rooms']}
 - Grupy: {context['groups']}
 - Przypisania do zaplanowania: {context['assignments']}
-- Dostępnych slotów: {context['available_slots']} (5 dni × 5 bloków × {context['rooms']} sal)
+- Dostępnych slotów: {context['available_slots']} (5 dni × 5 bloków × {context['rooms']} sal){online_hint}
 
 KONFLIKTY / PROBLEMY:
 {chr(10).join(f"- {c}" for c in conflicts)}
 
-Zaproponuj konkretne, praktyczne zmiany które pozwolą wygenerować plan. Odpowiedz krótko i po polsku — maksymalnie 5 punktów. Każdy punkt niech zaczyna się od czasownika (np. "Zmniejsz...", "Dodaj...", "Rozdziel..."). Skup się na najbardziej prawdopodobnych przyczynach konfliktu."""
+Zaproponuj konkretne, praktyczne zmiany które pozwolą wygenerować plan. Odpowiedz krótko i po polsku — maksymalnie 5 punktów. Każdy punkt niech zaczyna się od czasownika (np. "Zmniejsz...", "Dodaj...", "Rozdziel...", "Przenieś..."). Jeśli problem dotyczy przepełnienia sal, wskaż konkretne kursy do przeniesienia online (jeśli są takie możliwości). Skup się na najbardziej prawdopodobnych przyczynach konfliktu."""
 
     response = _get_client().chat.completions.create(
         model="gpt-4o-mini",

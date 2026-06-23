@@ -70,6 +70,22 @@ export interface ScheduleEntry {
   group: StudentGroup;
 }
 
+export interface GenerationAttempt {
+  id: number;
+  created_at: string;
+  success: boolean;
+  entries_count: number;
+  online_count: number;
+  conflicts: string[];
+  thinking: string;
+  suggestions: string;
+  notes: string;
+  lecturers_count: number;
+  rooms_count: number;
+  groups_count: number;
+  assignments_count: number;
+}
+
 export const DAYS_PL = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek"];
 export const DAYS_SHORT = ["Pon", "Wt", "Śr", "Czw", "Pt"];
 

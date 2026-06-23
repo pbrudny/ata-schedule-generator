@@ -59,6 +59,13 @@ export const assignments = {
   remove: (id: number) => del(`/assignments/${id}`),
 };
 
+// Generation history
+export const generationHistory = {
+  list:        ()                              => get("/generation-history"),
+  get:         (id: number)                   => get(`/generation-history/${id}`),
+  updateNotes: (id: number, notes: string)    => req("PATCH", `/generation-history/${id}`, { notes }),
+};
+
 // Public availability (no auth — lecturer self-service)
 export const availability = {
   get:    (token: string)                       => get(`/availability/${token}`),

@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Table, Text, JSON
+from datetime import datetime
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text, JSON
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -118,3 +119,21 @@ class ScheduleEntry(Base):
     lecturer = relationship("Lecturer", back_populates="schedule_entries")
     room = relationship("Room", back_populates="schedule_entries")
     group = relationship("StudentGroup", back_populates="schedule_entries")
+
+
+class GenerationAttempt(Base):
+    __tablename__ = "generation_attempts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    success = Column(Boolean, default=False)
+    entries_count = Column(Integer, default=0)
+    online_count = Column(Integer, default=0)
+    conflicts = Column(JSON, default=list)
+    thinking = Column(Text, default="")
+    suggestions = Column(Text, default="")
+    notes = Column(Text, default="")
+    lecturers_count = Column(Integer, default=0)
+    rooms_count = Column(Integer, default=0)
+    groups_count = Column(Integer, default=0)
+    assignments_count = Column(Integer, default=0)

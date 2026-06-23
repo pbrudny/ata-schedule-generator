@@ -6,6 +6,7 @@ import CoursesPage from "./pages/Courses";
 import AssignmentsPage from "./pages/Assignments";
 import SchedulePage from "./pages/Schedule";
 import AvailabilityPage from "./pages/AvailabilityPage";
+import GenerationHistoryPage from "./pages/GenerationHistory";
 
 const NAV = [
   { to: "/",            label: "Plan"          },
@@ -14,6 +15,7 @@ const NAV = [
   { to: "/grupy",       label: "Grupy"         },
   { to: "/przedmioty",  label: "Przedmioty"    },
   { to: "/przypisania", label: "Przypisania"   },
+  { to: "/historia",    label: "Historia"      },
 ];
 
 function AdminLayout() {
@@ -55,6 +57,7 @@ function AdminLayout() {
           <Route path="/grupy"       element={<GroupsPage />} />
           <Route path="/przedmioty"  element={<CoursesPage />} />
           <Route path="/przypisania" element={<AssignmentsPage />} />
+          <Route path="/historia"    element={<GenerationHistoryPage />} />
         </Routes>
       </main>
 

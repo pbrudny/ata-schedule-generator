@@ -13,6 +13,7 @@ from .database import Base, engine, get_db
 from .models import (
     Course,
     CourseAssignment,
+    GenerationAttempt,
     Lecturer,
     Room,
     ScheduleEntry,
@@ -28,6 +29,8 @@ from .schemas import (
     CourseOut,
     CourseUpdate,
     GenerateResult,
+    GenerationAttemptNotesUpdate,
+    GenerationAttemptOut,
     LecturerCreate,
     LecturerOut,
     LecturerUpdate,
@@ -369,27 +372,43 @@ def stream_generate(db: Session = Depends(get_db)):
         ],
     }
 
+    snapshot = {
+        "lecturers_count": llm_context["lecturers_count"],
+        "rooms_count": llm_context["rooms_count"],
+        "groups_count": db.query(StudentGroup).count(),
+        "assignments_count": llm_context["assignments_count"],
+    }
+
     def event_stream():
+        thinking_chunks: list[str] = []
+
         # Phase 1: LLM pre-analysis (streamed)
         try:
             for chunk in stream_pre_analysis(llm_context):
+                thinking_chunks.append(chunk)
                 yield f"data: {json.dumps({'type': 'thinking', 'text': chunk})}\n\n"
         except Exception as exc:
-            yield f"data: {json.dumps({'type': 'thinking', 'text': f'[Analiza niedostępna: {exc}]'})}\n\n"
+            thinking_chunks.append(f"[Analiza niedostępna: {exc}]")
+            yield f"data: {json.dumps({'type': 'thinking', 'text': thinking_chunks[-1]})}\n\n"
 
         # Phase 2: OR-Tools solver
         yield f"data: {json.dumps({'type': 'solving'})}\n\n"
         count, conflicts = generate_schedule(db)
 
+        online_count = db.query(ScheduleEntry).filter(
+            ScheduleEntry.is_manual == False,  # noqa: E712
+            ScheduleEntry.room_id == None,  # noqa: E711
+        ).count()
+
         # Phase 3: LLM suggestions on failure
         suggestions = None
         if conflicts or count == 0:
             solver_context = {
-                "lecturers": db.query(Lecturer).count(),
-                "rooms": len(all_rooms),
-                "groups": db.query(StudentGroup).count(),
-                "assignments": len(all_assignments),
-                "available_slots": len(all_rooms) * 5 * 5,
+                "lecturers": snapshot["lecturers_count"],
+                "rooms": snapshot["rooms_count"],
+                "groups": snapshot["groups_count"],
+                "assignments": snapshot["assignments_count"],
+                "available_slots": snapshot["rooms_count"] * 5 * 5,
                 "online_capable_courses": [
                     a.course.name for a in all_assignments if a.course.can_be_online
                 ],
@@ -398,6 +417,19 @@ def stream_generate(db: Session = Depends(get_db)):
                 suggestions = suggest_adjustments(conflicts, solver_context)
             except Exception:
                 pass
+
+        # Save attempt
+        attempt = GenerationAttempt(
+            success=(count > 0 and not conflicts),
+            entries_count=count,
+            online_count=online_count,
+            conflicts=conflicts,
+            thinking="".join(thinking_chunks),
+            suggestions=suggestions or "",
+            **snapshot,
+        )
+        db.add(attempt)
+        db.commit()
 
         yield f"data: {json.dumps({'type': 'result', 'entries_count': count, 'conflicts': conflicts, 'suggestions': suggestions})}\n\n"
 
@@ -410,15 +442,24 @@ def stream_generate(db: Session = Depends(get_db)):
 
 @router.post("/schedule/generate", response_model=GenerateResult)
 def run_generate(db: Session = Depends(get_db)):
+    n_lecturers = db.query(Lecturer).count()
+    n_rooms = db.query(Room).count()
+    n_groups = db.query(StudentGroup).count()
+    n_assignments = db.query(CourseAssignment).count()
+
     count, conflicts = generate_schedule(db)
+
+    online_count = db.query(ScheduleEntry).filter(
+        ScheduleEntry.is_manual == False,  # noqa: E712
+        ScheduleEntry.room_id == None,     # noqa: E711
+    ).count()
+
     suggestions = None
     if conflicts or count == 0:
         context = {
-            "lecturers": db.query(Lecturer).count(),
-            "rooms": db.query(Room).count(),
-            "groups": db.query(StudentGroup).count(),
-            "assignments": db.query(CourseAssignment).count(),
-            "available_slots": db.query(Room).count() * 5 * 5,
+            "lecturers": n_lecturers, "rooms": n_rooms,
+            "groups": n_groups, "assignments": n_assignments,
+            "available_slots": n_rooms * 5 * 5,
             "online_capable_courses": [
                 a.course.name for a in db.query(CourseAssignment).all() if a.course.can_be_online
             ],
@@ -427,6 +468,17 @@ def run_generate(db: Session = Depends(get_db)):
             suggestions = suggest_adjustments(conflicts, context)
         except Exception:
             pass
+
+    attempt = GenerationAttempt(
+        success=(count > 0 and not conflicts),
+        entries_count=count, online_count=online_count,
+        conflicts=conflicts, suggestions=suggestions or "",
+        lecturers_count=n_lecturers, rooms_count=n_rooms,
+        groups_count=n_groups, assignments_count=n_assignments,
+    )
+    db.add(attempt)
+    db.commit()
+
     return GenerateResult(entries_count=count, conflicts=conflicts, suggestions=suggestions)
 
 
@@ -434,6 +486,32 @@ def run_generate(db: Session = Depends(get_db)):
 def clear_schedule(db: Session = Depends(get_db)):
     db.query(ScheduleEntry).filter(ScheduleEntry.is_manual == False).delete()  # noqa: E712
     db.commit()
+
+
+# ── Generation history ────────────────────────────────────────────────────────
+
+@router.get("/generation-history", response_model=list[GenerationAttemptOut])
+def list_generation_history(db: Session = Depends(get_db)):
+    return db.query(GenerationAttempt).order_by(GenerationAttempt.created_at.desc()).all()
+
+
+@router.get("/generation-history/{attempt_id}", response_model=GenerationAttemptOut)
+def get_generation_attempt(attempt_id: int, db: Session = Depends(get_db)):
+    obj = db.get(GenerationAttempt, attempt_id)
+    if not obj:
+        raise HTTPException(404, "Próba generowania nie istnieje")
+    return obj
+
+
+@router.patch("/generation-history/{attempt_id}", response_model=GenerationAttemptOut)
+def update_attempt_notes(attempt_id: int, body: GenerationAttemptNotesUpdate, db: Session = Depends(get_db)):
+    obj = db.get(GenerationAttempt, attempt_id)
+    if not obj:
+        raise HTTPException(404, "Próba generowania nie istnieje")
+    obj.notes = body.notes
+    db.commit()
+    db.refresh(obj)
+    return obj
 
 
 # ── Public availability form (no auth) ───────────────────────────────────────

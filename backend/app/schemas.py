@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Optional
 from pydantic import BaseModel
 
@@ -198,3 +199,26 @@ class GenerateResult(BaseModel):
     entries_count: int
     conflicts: list[str]
     suggestions: Optional[str] = None
+
+
+# ── Generation history ────────────────────────────────────────────────────────
+
+class GenerationAttemptOut(BaseModel):
+    id: int
+    created_at: datetime
+    success: bool
+    entries_count: int
+    online_count: int
+    conflicts: list[str]
+    thinking: str
+    suggestions: str
+    notes: str
+    lecturers_count: int
+    rooms_count: int
+    groups_count: int
+    assignments_count: int
+    model_config = {"from_attributes": True}
+
+
+class GenerationAttemptNotesUpdate(BaseModel):
+    notes: str

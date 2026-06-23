@@ -1,6 +1,7 @@
-"""LLM-based schedule conflict analysis."""
+"""LLM-based schedule analysis and suggestions."""
 
 import os
+from typing import Generator
 from openai import OpenAI
 
 _client: OpenAI | None = None
@@ -11,6 +12,39 @@ def _get_client() -> OpenAI:
     if _client is None:
         _client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     return _client
+
+
+def stream_pre_analysis(context: dict) -> Generator[str, None, None]:
+    """Stream LLM chain-of-thought analysis before OR-Tools runs."""
+    assignments_text = "\n".join(
+        f"- {a['course']} ({a['type']}) | {a['lecturer']} | "
+        f"grupy: {', '.join(a['groups']) or '—'} | {a['sessions_per_week']}×/tydz."
+        for a in context.get("assignment_details", [])
+    )
+
+    prompt = f"""Jesteś asystentem dziekanatu analizującym dane przed uruchomieniem algorytmu układania planu zajęć.
+
+ZASOBY:
+- Sale: {context['rooms_count']} (łącznie {context['rooms_count'] * 25} slotów tygodniowo)
+- Slotów do zaplanowania łącznie: {context['total_slots_needed']}
+- Wykładowców z ograniczoną dostępnością: {context['restricted_lecturers_count']} z {context['lecturers_count']}
+
+PRZYPISANIA ({context['assignments_count']} pozycji):
+{assignments_text}
+
+Analizuj dane myśląc głośno po polsku. Wskaż potencjalne wąskie gardła, kolizje i ryzyka — np. wykładowca z wieloma przypisaniami, grupy z dużą liczbą zajęć, brak sal o wymaganej pojemności, ograniczona dostępność. Pisz płynnie jak strumień myśli, bez nagłówków i list punktowanych. Bądź konkretny."""
+
+    stream = _get_client().chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=700,
+        temperature=0.4,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
 
 
 def suggest_adjustments(conflicts: list[str], context: dict) -> str:

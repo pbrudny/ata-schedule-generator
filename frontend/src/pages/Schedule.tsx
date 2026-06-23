@@ -14,6 +14,7 @@ import {
 } from "../types";
 
 type FilterMode = "group" | "lecturer" | "room";
+type Phase = "idle" | "thinking" | "solving" | "done";
 
 function entryToEvent(entry: ScheduleEntry) {
   const date = entryToDate(entry.day);
@@ -38,10 +39,14 @@ export default function SchedulePage() {
   const [rooms, setRooms]           = useState<Room[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("group");
   const [filterId, setFilterId]     = useState<number | "">("");
-  const [generating, setGenerating] = useState(false);
+  const [phase, setPhase]           = useState<Phase>("idle");
+  const [thinking, setThinking]     = useState("");
   const [message, setMessage]       = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [suggestions, setSuggestions] = useState<string | null>(null);
+  const thinkingRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<FullCalendar>(null);
+
+  const generating = phase === "thinking" || phase === "solving";
 
   const loadMeta = async () => {
     const [g, l, r] = await Promise.all([
@@ -66,21 +71,64 @@ export default function SchedulePage() {
   useEffect(() => { loadMeta(); }, []);
   useEffect(() => { loadSchedule(); }, [filterMode, filterId]); // eslint-disable-line
 
+  // Auto-scroll thinking panel
+  useEffect(() => {
+    if (thinkingRef.current) {
+      thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+    }
+  }, [thinking]);
+
   const generate = async () => {
-    setGenerating(true); setMessage(null); setSuggestions(null);
+    setPhase("thinking");
+    setThinking("");
+    setMessage(null);
+    setSuggestions(null);
+
     try {
-      const res = await api.generate() as { entries_count: number; conflicts: string[]; suggestions?: string };
-      if (res.conflicts.length > 0) {
-        setMessage({ type: "error", text: res.conflicts.join(" | ") });
-      } else {
-        setMessage({ type: "success", text: `Plan wygenerowany pomyślnie — ${res.entries_count} wpisów.` });
+      const response = await fetch("/api/schedule/generate/stream", { method: "POST" });
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = JSON.parse(line.slice(6)) as {
+            type: string;
+            text?: string;
+            entries_count?: number;
+            conflicts?: string[];
+            suggestions?: string;
+          };
+
+          if (data.type === "thinking" && data.text) {
+            setThinking((prev) => prev + data.text);
+          } else if (data.type === "solving") {
+            setPhase("solving");
+          } else if (data.type === "result") {
+            setPhase("done");
+            if ((data.conflicts?.length ?? 0) > 0) {
+              setMessage({ type: "error", text: data.conflicts!.join(" | ") });
+            } else {
+              setMessage({ type: "success", text: `Plan wygenerowany pomyślnie — ${data.entries_count} wpisów.` });
+            }
+            if (data.suggestions) setSuggestions(data.suggestions);
+            loadSchedule();
+          }
+        }
       }
-      if (res.suggestions) setSuggestions(res.suggestions);
-      loadSchedule();
     } catch (e: unknown) {
       setMessage({ type: "error", text: String(e) });
-    } finally {
-      setGenerating(false);
+      setPhase("done");
     }
   };
 
@@ -102,10 +150,41 @@ export default function SchedulePage() {
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
         <h1 style={{ fontSize: "1.25rem", fontWeight: 700, marginRight: "auto" }}>Plan zajęć</h1>
         <button className="btn-success" onClick={generate} disabled={generating} style={{ minWidth: "160px" }}>
-          {generating ? "Generowanie…" : "Generuj plan"}
+          {generating ? (phase === "thinking" ? "Analiza AI…" : "Solver pracuje…") : "Generuj plan"}
         </button>
-        <button className="btn-ghost" onClick={clearAuto}>Wyczyść auto</button>
+        <button className="btn-ghost" onClick={clearAuto} disabled={generating}>Wyczyść auto</button>
       </div>
+
+      {/* AI thinking panel */}
+      {(thinking || phase === "solving") && (
+        <div style={{
+          background: "#0f172a", borderRadius: "10px", padding: "1rem 1.25rem",
+          marginBottom: "1rem", border: "1px solid #1e3a5f",
+        }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#60a5fa", marginBottom: "0.6rem", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            Analiza AI — proces myślenia
+          </div>
+          <div
+            ref={thinkingRef}
+            style={{
+              fontSize: "0.84rem", color: "#cbd5e1", lineHeight: 1.65,
+              whiteSpace: "pre-wrap", maxHeight: "220px", overflowY: "auto",
+              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+            }}
+          >
+            {thinking}
+            {phase === "thinking" && (
+              <span style={{ display: "inline-block", width: "8px", height: "1em", background: "#60a5fa", marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 1s step-end infinite" }} />
+            )}
+          </div>
+          {phase === "solving" && (
+            <div style={{ marginTop: "0.75rem", color: "#94a3b8", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#3b82f6", animation: "blink 1s ease-in-out infinite" }} />
+              Solver OR-Tools szuka optymalnego planu…
+            </div>
+          )}
+        </div>
+      )}
 
       {message && (
         <div className={`alert ${message.type === "error" ? "alert-error" : "alert-success"}`}>
@@ -207,6 +286,13 @@ export default function SchedulePage() {
           Plan jest pusty. Dodaj przypisania, a następnie kliknij „Generuj plan".
         </p>
       )}
+
+      <style>{`
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

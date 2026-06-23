@@ -1,7 +1,8 @@
+import json
 import os
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import APIRouter
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -41,7 +42,7 @@ from .schemas import (
     StudentGroupUpdate,
 )
 from .scheduler import generate_schedule
-from .llm import suggest_adjustments
+from .llm import suggest_adjustments, stream_pre_analysis
 
 Base.metadata.create_all(bind=engine)
 
@@ -343,6 +344,65 @@ def delete_entry(entry_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Wpis nie istnieje")
     db.delete(obj)
     db.commit()
+
+
+@router.post("/schedule/generate/stream")
+def stream_generate(db: Session = Depends(get_db)):
+    all_assignments = db.query(CourseAssignment).all()
+    all_rooms = db.query(Room).all()
+
+    llm_context = {
+        "lecturers_count": db.query(Lecturer).count(),
+        "rooms_count": len(all_rooms),
+        "assignments_count": len(all_assignments),
+        "total_slots_needed": sum(len(a.groups) * a.sessions_per_week for a in all_assignments),
+        "restricted_lecturers_count": sum(1 for a in all_assignments if a.lecturer.availability),
+        "assignment_details": [
+            {
+                "course": a.course.name,
+                "type": a.course.type,
+                "lecturer": f"{a.lecturer.title} {a.lecturer.name}".strip(),
+                "groups": [g.name for g in a.groups],
+                "sessions_per_week": a.sessions_per_week,
+            }
+            for a in all_assignments
+        ],
+    }
+
+    def event_stream():
+        # Phase 1: LLM pre-analysis (streamed)
+        try:
+            for chunk in stream_pre_analysis(llm_context):
+                yield f"data: {json.dumps({'type': 'thinking', 'text': chunk})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'thinking', 'text': f'[Analiza niedostępna: {exc}]'})}\n\n"
+
+        # Phase 2: OR-Tools solver
+        yield f"data: {json.dumps({'type': 'solving'})}\n\n"
+        count, conflicts = generate_schedule(db)
+
+        # Phase 3: LLM suggestions on failure
+        suggestions = None
+        if conflicts or count == 0:
+            solver_context = {
+                "lecturers": db.query(Lecturer).count(),
+                "rooms": len(all_rooms),
+                "groups": db.query(StudentGroup).count(),
+                "assignments": len(all_assignments),
+                "available_slots": len(all_rooms) * 5 * 5,
+            }
+            try:
+                suggestions = suggest_adjustments(conflicts, solver_context)
+            except Exception:
+                pass
+
+        yield f"data: {json.dumps({'type': 'result', 'entries_count': count, 'conflicts': conflicts, 'suggestions': suggestions})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/schedule/generate", response_model=GenerateResult)
